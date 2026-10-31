@@ -201,12 +201,11 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Esercizi Registrati", len(df_visibile))
             c2.metric("Media Fatica", f"{df_visibile['Difficoltà'].mean():.1f} / 5 ⭐")
-            if is_coach:
-                c3.metric("Atleta più attivo", df_visibile['Utente'].mode().upper() if not df_visibile['Utente'].empty else "N/D")
-            else:
-                c3.metric("Fase più eseguita", df_visibile['Fase'].mode() if not df_visibile['Fase'].empty else "N/D")
             
-            st.write("---")
-            col_pre, col_post, col_casa = st.columns(3)
-            with col_pre:
-                st.markdown("#### ⚡ PRE GARA")
+            # Correzione dell'errore sulla stringa .mode()
+            if is_coach:
+                most_active = df_visibile['Utente'].mode()
+                c3.metric("Atleta più attivo", most_active.values[0].upper() if not most_active.empty else "N/D")
+            else:
+                most_phase = df_visibile['Fase'].mode()
+                c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
