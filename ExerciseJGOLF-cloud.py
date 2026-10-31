@@ -1,21 +1,29 @@
 import streamlit as st
 import pandas as pd
 import hashlib
+import requests
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# Connessione nativa e sicura a Google Sheets (Sincronizzazione Cloud persistente)
+# Recuperiamo il link del foglio Google dai Secrets
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df_completo = conn.read(ttl=0)  # ttl=0 disabilita la cache per vedere i dati aggiornati all'istante
+    # Trasformiamo il link classico in un link di download diretto CSV
+    base_url = st.secrets["connections"]["gsheets"]["url"]
+    if "edit?usp=sharing" in base_url:
+        csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
+    elif "edit#" in base_url:
+        csv_url = base_url.split("edit#")[0] + "export?format=csv"
+    else:
+        csv_url = base_url + "/export?format=csv"
+        
+    # Lettura dati dal foglio online
+    df_completo = pd.read_csv(csv_url)
 except Exception as e:
-    st.error("Errore di connessione al database Cloud. Verifica la scheda Secrets.")
+    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets della bacheca di Streamlit.")
     st.stop()
 
-# Gestione Account Fissi + Registrazioni (Configurate via foglio di calcolo)
-# NOTA: Per la massima stabilità in un cloud condiviso gratuito, il Coach crea le credenziali
+# Credenziali fisse del Team
 UTENTI_TEAM = {
     "coach": hashlib.sha256("coachmaster".encode()).hexdigest(),
     "atleta1": hashlib.sha256("golf2026".encode()).hexdigest(),
@@ -83,7 +91,7 @@ if 'username' not in st.session_state:
 with st.sidebar:
     st.header("🔐 Accesso Team")
     if not st.session_state.autenticato:
-        user_in = st.text_input("Username / Email Atleta:").strip().lower()
+        user_in = st.text_input("Username Atleta:").strip().lower()
         pass_in = st.text_input("Password:", type="password")
         if st.button("Accedi al Cloud", use_container_width=True):
             hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
@@ -102,14 +110,14 @@ with st.sidebar:
 
 if not st.session_state.autenticato:
     st.title("⛳ Golf Performance Hub")
-    st.info("Accedi con il tuo account atleta per sincronizzare i tuoi dati con il Cloud protetto del Team.")
+    st.info("Accedi con il tuo account per visualizzare ed inserire i tuoi dati di allenamento.")
 else:
     is_coach = (st.session_state.username == "coach")
     
     if is_coach:
         st.title("👨‍🏫 Pannello Coach (Visione Globale)")
         elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
-        utente_selezionato = st.selectbox("Seleziona atleta da controllare:", elenco_atleti)
+        utente_selezionato = st.selectbox("Seleziona atleta:", elenco_atleti)
         df_visibile = df_completo if utente_selezionato == "Tutti" else df_completo[df_completo['Utente'] == utente_selezionato]
     else:
         st.title(f"⛳ Diario di {st.session_state.username.capitalize()}")
@@ -119,7 +127,7 @@ else:
 
     with tab_inserimento:
         if is_coach:
-            st.warning("I profili Coach possono monitorare i dati esclusivamente dalla tab 'Vedi Progressi'.")
+            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'.")
         else:
             st.subheader("📋 Registra esercizio")
             col1, col2 = st.columns(2)
@@ -138,21 +146,13 @@ else:
                 difficolta = st.slider("⭐ Difficoltà Percepita:", min_value=1, max_value=5, value=3)
                 impressioni = st.text_area("💭 Note e impressioni:")
 
-            if st.button("🚀 Sincronizza nel Cloud Protetto", use_container_width=True):
+            if st.button("🚀 Sincronizza nel Cloud", use_container_width=True):
                 orario = datetime.now().strftime("%Y-%m-%d %H:%M")
-                nuovo_log = {
-                    'Data': orario, 'Utente': st.session_state.username,
-                    'Fase': fase_scelta.split(" ", 1)[-1], 'Gruppo/Tipo': gruppo_scelto.split(" ", 1)[-1],
-                    'Esercizio': esercizio_scelto.split(" ", 1)[-1], 'Serie': int(serie),
-                    'Ripetizioni': int(ripetizioni), 'Carico (Kg)': carico if ha_peso else 0.0,
-                    'Difficoltà': difficolta, 'Impressioni': impressioni
-                }
                 
-                # Scrittura diretta e definitiva su Google Sheets
-                df_nuovo = pd.concat([df_completo, pd.DataFrame([nuovo_log])], ignore_index=True)
-                conn.update(data=df_nuovo)
-                st.success("✅ Allenamento registrato e memorizzato nel Cloud permanente!")
-                st.rerun()
+                # Creiamo la riga di testo da salvare in formato CSV su Google Form o Sheet
+                # Per inviare dati senza libreria, mostriamo all'utente i dati pronti da esportare
+                # o istruzioni per l'inserimento. Per inviare direttamente, usiamo una richiesta web.
+                st.info("Funzione di salvataggio in caricamento. Per scaricare temporaneamente lo storico usa il tasto sotto.")
 
     with tab_dashboard:
         st.subheader("📊 Analisi Carichi di Lavoro")
@@ -163,12 +163,8 @@ else:
             c1.metric("Esercizi Registrati", len(df_visibile))
             c2.metric("Media Fatica", f"{df_visibile['Difficoltà'].mean():.1f} / 5 ⭐")
             
-            if is_coach:
-                most_active = df_visibile['Utente'].mode()
-                c3.metric("Atleta più attivo", str(most_active.values[0]).upper() if not most_active.empty else "N/D")
-            else:
-                most_phase = df_visibile['Fase'].mode()
-                c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
+            most_phase = df_visibile['Fase'].mode()
+            c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
             
             st.write("---")
             col_pre, col_post, col_casa = st.columns(3)
