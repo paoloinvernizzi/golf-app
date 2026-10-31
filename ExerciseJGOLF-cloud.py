@@ -1,60 +1,27 @@
 import streamlit as st
 import pandas as pd
-import os
 import hashlib
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# Utilizziamo la cartella /tmp del server cloud per garantire la persistenza locale tra le sessioni brevi
-# o per evitare conflitti di scrittura a runtime
-DB_FILE = "golf_cloud_database.csv"
-USERS_FILE = "golf_cloud_users.csv"
+# Connessione nativa e sicura a Google Sheets (Sincronizzazione Cloud persistente)
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df_completo = conn.read(ttl=0)  # ttl=0 disabilita la cache per vedere i dati aggiornati all'istante
+except Exception as e:
+    st.error("Errore di connessione al database Cloud. Verifica la scheda Secrets.")
+    st.stop()
 
-if not os.path.exists(DB_FILE):
-    df_init = pd.DataFrame(columns=['Data', 'Utente', 'Fase', 'Gruppo/Tipo', 'Esercizio', 'Serie', 'Ripetizioni', 'Carico (Kg)', 'Difficoltà', 'Impressioni'])
-    df_init.to_csv(DB_FILE, index=False)
-
-if not os.path.exists(USERS_FILE):
-    df_u_init = pd.DataFrame(columns=['Username', 'Password'])
-    default_users = [
-        {'Username': 'coach', 'Password': hashlib.sha256('coachmaster'.encode()).hexdigest()},
-        {'Username': 'atleta1', 'Password': hashlib.sha256('golf2026'.encode()).hexdigest()},
-        {'Username': 'atleta2', 'Password': hashlib.sha256('golf2026'.encode()).hexdigest()}
-    ]
-    df_u_init = pd.concat([df_u_init, pd.DataFrame(default_users)], ignore_index=True)
-    df_u_init.to_csv(USERS_FILE, index=False)
-
-def carica_dati():
-    if os.path.exists(DB_FILE):
-        return pd.read_csv(DB_FILE)
-    return pd.DataFrame()
-
-def salva_dato(nuovo_record):
-    df = carica_dati()
-    df = pd.concat([df, pd.DataFrame([nuovo_record])], ignore_index=True)
-    df.to_csv(DB_FILE, index=False)
-    return df
-
-def carica_utenti():
-    if os.path.exists(USERS_FILE):
-        return pd.read_csv(USERS_FILE)
-    return pd.DataFrame(columns=['Username', 'Password'])
-
-def registra_nuovo_utente(username, password):
-    df_u = carica_utenti()
-    if username in df_u['Username'].values:
-        return False
-    hashed_p = hashlib.sha256(password.encode()).hexdigest()
-    nuovo_u = pd.DataFrame([{'Username': username, 'Password': hashed_p}])
-    df_u = pd.concat([df_u, nuovo_u], ignore_index=True)
-    df_u.to_csv(USERS_FILE, index=False)
-    return True
-
-def verifica_credenziali(username, password):
-    df_u = carica_utenti()
-    hashed_p = hashlib.sha256(password.encode()).hexdigest()
-    return not df_u[(df_u['Username'] == username) & (df_u['Password'] == hashed_p)].empty
+# Gestione Account Fissi + Registrazioni (Configurate via foglio di calcolo)
+# NOTA: Per la massima stabilità in un cloud condiviso gratuito, il Coach crea le credenziali
+UTENTI_TEAM = {
+    "coach": hashlib.sha256("coachmaster".encode()).hexdigest(),
+    "atleta1": hashlib.sha256("golf2026".encode()).hexdigest(),
+    "atleta2": hashlib.sha256("golf2026".encode()).hexdigest(),
+    "atleta3": hashlib.sha256("golf2026".encode()).hexdigest()
+}
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": {
@@ -116,28 +83,18 @@ if 'username' not in st.session_state:
 with st.sidebar:
     st.header("🔐 Accesso Team")
     if not st.session_state.autenticato:
-        modalita = st.radio("Scegli un'azione:", ["Accedi al Cloud", "Registra Nuovo Atleta"])
-        user_in = st.text_input("Username / Email:").strip().lower()
+        user_in = st.text_input("Username / Email Atleta:").strip().lower()
         pass_in = st.text_input("Password:", type="password")
-        if modalita == "Accedi al Cloud":
-            if st.button("Entra", use_container_width=True):
-                if verifica_credenziali(user_in, pass_in):
-                    st.session_state.autenticato = True
-                    st.session_state.username = user_in
-                    st.rerun()
-                else:
-                    st.error("Credenziali non valide.")
-        else:
-            if st.button("Crea Account", use_container_width=True):
-                if user_in and pass_in:
-                    if registra_nuovo_utente(user_in, pass_in):
-                        st.success("✅ Profilo creato! Ora seleziona 'Accedi al Cloud' per entrare.")
-                    else:
-                        st.error("Questo username è già registrato nel team.")
-                else:
-                    st.warning("Inserisci sia username che password.")
+        if st.button("Accedi al Cloud", use_container_width=True):
+            hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
+            if user_in in UTENTI_TEAM and UTENTI_TEAM[user_in] == hash_in:
+                st.session_state.autenticato = True
+                st.session_state.username = user_in
+                st.rerun()
+            else:
+                st.error("Credenziali non valide.")
     else:
-        st.success(f"🌐 Cloud Connesso: **{st.session_state.username.upper()}**")
+        st.success(f"🌐 Cloud Connesso: {st.session_state.username.upper()}")
         if st.button("🚪 Esci", use_container_width=True):
             st.session_state.autenticato = False
             st.session_state.username = ""
@@ -145,15 +102,14 @@ with st.sidebar:
 
 if not st.session_state.autenticato:
     st.title("⛳ Golf Performance Hub")
-    st.info("Accedi o crea il tuo account personale dal menu a sinistra per salvare i tuoi allenamenti.")
+    st.info("Accedi con il tuo account atleta per sincronizzare i tuoi dati con il Cloud protetto del Team.")
 else:
     is_coach = (st.session_state.username == "coach")
-    df_completo = carica_dati()
+    
     if is_coach:
         st.title("👨‍🏫 Pannello Coach (Visione Globale)")
-        df_u_registrati = carica_utenti()
-        elenco_atleti = ["Tutti"] + [u for u in df_u_registrati['Username'].values if u != "coach"]
-        utente_selezionato = st.selectbox("Seleziona atleta:", elenco_atleti)
+        elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
+        utente_selezionato = st.selectbox("Seleziona atleta da controllare:", elenco_atleti)
         df_visibile = df_completo if utente_selezionato == "Tutti" else df_completo[df_completo['Utente'] == utente_selezionato]
     else:
         st.title(f"⛳ Diario di {st.session_state.username.capitalize()}")
@@ -163,7 +119,7 @@ else:
 
     with tab_inserimento:
         if is_coach:
-            st.warning("I coach possono guardare i dati nella tab dei progressi.")
+            st.warning("I profili Coach possono monitorare i dati esclusivamente dalla tab 'Vedi Progressi'.")
         else:
             st.subheader("📋 Registra esercizio")
             col1, col2 = st.columns(2)
@@ -182,7 +138,7 @@ else:
                 difficolta = st.slider("⭐ Difficoltà Percepita:", min_value=1, max_value=5, value=3)
                 impressioni = st.text_area("💭 Note e impressioni:")
 
-            if st.button("🚀 Sincronizza nel Cloud Libero", use_container_width=True):
+            if st.button("🚀 Sincronizza nel Cloud Protetto", use_container_width=True):
                 orario = datetime.now().strftime("%Y-%m-%d %H:%M")
                 nuovo_log = {
                     'Data': orario, 'Utente': st.session_state.username,
@@ -191,14 +147,17 @@ else:
                     'Ripetizioni': int(ripetizioni), 'Carico (Kg)': carico if ha_peso else 0.0,
                     'Difficoltà': difficolta, 'Impressioni': impressioni
                 }
-                salva_dato(nuovo_log)
-                st.success("✅ Salvato nel Cloud di squadra!")
+                
+                # Scrittura diretta e definitiva su Google Sheets
+                df_nuovo = pd.concat([df_completo, pd.DataFrame([nuovo_log])], ignore_index=True)
+                conn.update(data=df_nuovo)
+                st.success("✅ Allenamento registrato e memorizzato nel Cloud permanente!")
                 st.rerun()
 
     with tab_dashboard:
         st.subheader("📊 Analisi Carichi di Lavoro")
         if df_visibile.empty:
-            st.info("Ancora nessun dato registrato su questo account.")
+            st.info("Nessun dato registrato al momento.")
         else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Esercizi Registrati", len(df_visibile))
@@ -209,3 +168,26 @@ else:
                 c3.metric("Atleta più attivo", str(most_active.values[0]).upper() if not most_active.empty else "N/D")
             else:
                 most_phase = df_visibile['Fase'].mode()
+                c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
+            
+            st.write("---")
+            col_pre, col_post, col_casa = st.columns(3)
+            with col_pre:
+                st.markdown("#### ⚡ PRE GARA")
+                sub_pre = df_visibile[df_visibile['Fase'] == "Pre Gara"]
+                st.metric("Sessioni", len(sub_pre))
+                if not sub_pre.empty: st.bar_chart(sub_pre.set_index('Data')['Difficoltà'], height=130)
+            with col_post:
+                st.markdown("#### 🧘 POST GARA")
+                sub_post = df_visibile[df_visibile['Fase'] == "Post Gara"]
+                st.metric("Sessioni", len(sub_post))
+                if not sub_post.empty: st.bar_chart(sub_post.set_index('Data')['Difficoltà'], height=130)
+            with col_casa:
+                st.markdown("#### 🏠 CASA")
+                sub_casa = df_visibile[df_visibile['Fase'] == "Allenamento a Casa"]
+                st.metric("Sessioni", len(sub_casa))
+                if not sub_casa.empty: st.bar_chart(sub_casa.set_index('Data')['Difficoltà'], height=130)
+
+            st.write("---")
+            st.markdown("### 📋 Registro Storico")
+            st.dataframe(df_visibile, use_container_width=True)
