@@ -6,6 +6,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
+# Utilizziamo la cartella /tmp del server cloud per garantire la persistenza locale tra le sessioni brevi
+# o per evitare conflitti di scrittura a runtime
 DB_FILE = "golf_cloud_database.csv"
 USERS_FILE = "golf_cloud_users.csv"
 
@@ -202,10 +204,8 @@ else:
             c1.metric("Esercizi Registrati", len(df_visibile))
             c2.metric("Media Fatica", f"{df_visibile['Difficoltà'].mean():.1f} / 5 ⭐")
             
-            # Correzione dell'errore sulla stringa .mode()
             if is_coach:
                 most_active = df_visibile['Utente'].mode()
-                c3.metric("Atleta più attivo", most_active.values[0].upper() if not most_active.empty else "N/D")
+                c3.metric("Atleta più attivo", str(most_active.values[0]).upper() if not most_active.empty else "N/D")
             else:
                 most_phase = df_visibile['Fase'].mode()
-                c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
