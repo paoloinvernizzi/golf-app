@@ -185,7 +185,7 @@ else:
                 except Exception as err:
                     st.error(f"Impossibile completare il salvataggio: {err}")
 
-    # --- TAB DASHBOARD & MONITORAGGIO ---
+        # --- TAB DASHBOARD & MONITORAGGIO ---
     with tab_dashboard:
         st.subheader("📊 Analisi Carichi di Lavoro")
         if df_visibile.empty:
@@ -210,3 +210,29 @@ else:
                 st.markdown("#### ⚡ ATTIVITÀ PRE GARA")
                 sub_pre = df_visibile[df_visibile['Fase'] == "⚡ Pre Gara"] if 'Fase' in df_visibile.columns else pd.DataFrame()
                 if not sub_pre.empty:
+                    mostrare = [c for c in ['Utente', 'Esercizio', col_diff] if c in sub_pre.columns]
+                    st.dataframe(sub_pre[mostrare], hide_index=True, use_container_width=True)
+                else:
+                    st.caption("Nessuna sessione pre-gara.")
+
+            with col_post:
+                st.markdown("#### 🧘 ATTIVITÀ POST GARA")
+                sub_post = df_visibile[df_visibile['Fase'] == "🧘 Post Gara"] if 'Fase' in df_visibile.columns else pd.DataFrame()
+                if not sub_post.empty:
+                    mostrare = [c for c in ['Utente', 'Esercizio', col_diff] if c in sub_post.columns]
+                    st.dataframe(sub_post[mostrare], hide_index=True, use_container_width=True)
+                else:
+                    st.caption("Nessuna sessione post-gara.")
+
+            with col_casa:
+                st.markdown("#### 🏠 ALLENAMENTO CASA")
+                sub_casa = df_visibile[df_visibile['Fase'] == "🏠 Allenamento a Casa"] if 'Fase' in df_visibile.columns else pd.DataFrame()
+                if not sub_casa.empty:
+                    mostrare = [c for c in ['Utente', 'Esercizio', col_diff] if c in sub_casa.columns]
+                    st.dataframe(sub_casa[mostrare], hide_index=True, use_container_width=True)
+                else:
+                    st.caption("Nessuna sessione a casa.")
+            
+            st.write("---")
+            st.markdown("#### 📋 Tabella Storico Completa")
+            st.dataframe(df_visibile, use_container_width=True)
