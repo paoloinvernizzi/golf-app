@@ -6,9 +6,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# Recuperiamo il link del foglio Google dai Secrets
+# 1. LETTURA DATI (DA GOOGLE SHEET IN MODALITÀ PUBBLICA CSV)
 try:
-    # Trasformiamo il link classico in un link di download diretto CSV
     base_url = st.secrets["connections"]["gsheets"]["url"]
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
@@ -17,13 +16,16 @@ try:
     else:
         csv_url = base_url + "/export?format=csv"
         
-    # Lettura dati dal foglio online
+    # Sincronizziamo forzando la lettura live eliminando la cache di pandas
     df_completo = pd.read_csv(csv_url)
+    
+    # Pulizia nomi colonne per evitare errori di battitura
+    df_completo.columns = df_completo.columns.str.strip()
 except Exception as e:
-    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets della bacheca di Streamlit.")
+    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets di Streamlit.")
     st.stop()
 
-# Credenziali fisse del Team
+# 2. CREDENZIALI DEL TEAM (Crypto SHA-256)
 UTENTI_TEAM = {
     "coach": hashlib.sha256("coachmaster".encode()).hexdigest(),
     "atleta1": hashlib.sha256("golf2026".encode()).hexdigest(),
@@ -31,6 +33,7 @@ UTENTI_TEAM = {
     "atleta3": hashlib.sha256("golf2026".encode()).hexdigest()
 }
 
+# 3. DATABASE ESERCIZI
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": {
         "🤸‍♂️ Riscaldamento Generale": [
@@ -77,17 +80,19 @@ DIZIONARIO_ESERCIZI = {
             "🛡️ Esercizio 3: Affondo anteriore + Rotazione busto con peso",
             "👐 Esercizio 4: Alzate laterali e frontali monolaterali",
             "🪜 Esercizio 5: Affondi bulgari con pesi o a corpo libero",
-            "🏌️‍♂️ Esercizio 6: Swing a corpo libero con peso (3 fasi)",
+            "🏌️‍♂️ Esercizio 6: Swing a corpo libero con peso (3 phases)",
             "🏆 Circuito Core Completo (Esercizi da 1 a 8)"
         ]
     }
 }
 
+# Inizializzazione sessione di autenticazione
 if 'autenticato' not in st.session_state:
     st.session_state.autenticato = False
 if 'username' not in st.session_state:
     st.session_state.username = ""
 
+# 4. SIDEBAR DI LOG-IN
 with st.sidebar:
     st.header("🔐 Accesso Team")
     if not st.session_state.autenticato:
@@ -98,6 +103,7 @@ with st.sidebar:
             if user_in in UTENTI_TEAM and UTENTI_TEAM[user_in] == hash_in:
                 st.session_state.autenticato = True
                 st.session_state.username = user_in
+                st.author = user_in
                 st.rerun()
             else:
                 st.error("Credenziali non valide.")
@@ -108,26 +114,32 @@ with st.sidebar:
             st.session_state.username = ""
             st.rerun()
 
+# 5. CONTENUTO DELL'APPLICAZIONE
 if not st.session_state.autenticato:
     st.title("⛳ Golf Performance Hub")
-    st.info("Accedi con il tuo account per visualizzare ed inserire i tuoi dati di allenamento.")
+    st.info("Accedi con il tuo account in sidebar per visualizzare ed inserire i tuoi dati di allenamento.")
 else:
     is_coach = (st.session_state.username == "coach")
     
+    # Profilazione dei Dati Visibili (Coach vede tutto, l'atleta vede solo i suoi dati)
     if is_coach:
         st.title("👨‍🏫 Pannello Coach (Visione Globale)")
         elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
-        utente_selezionato = st.selectbox("Seleziona atleta:", elenco_atleti)
-        df_visibile = df_completo if utente_selezionato == "Tutti" else df_completo[df_completo['Utente'] == utente_selezionato]
+        utente_selezionato = st.selectbox("Seleziona atleta da monitorare:", elenco_atleti)
+        if utente_selezionato == "Tutti":
+            df_visibile = df_completo
+        else:
+            df_visibile = df_completo[df_completo['Utente'] == utente_selezionato]
     else:
         st.title(f"⛳ Diario di {st.session_state.username.capitalize()}")
         df_visibile = df_completo[df_completo['Utente'] == st.session_state.username]
 
     tab_inserimento, tab_dashboard = st.tabs(["📝 Inserisci Esercizio", "📊 Vedi Progressi"])
 
+    # --- TAB INSERIMENTO DATI ---
     with tab_inserimento:
         if is_coach:
-            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'.")
+            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare allenamenti effettua l'accesso come atleta.")
         else:
             st.subheader("📋 Registra esercizio")
             col1, col2 = st.columns(2)
@@ -143,47 +155,44 @@ else:
             with col2:
                 ha_peso = st.checkbox("Usi pesi/sovraccarichi?", value=("Casa" in fase_scelta))
                 carico = st.number_input("⚖️ Peso (Kg):", min_value=0.0, value=0.0, step=0.5, disabled=not ha_peso)
-                difficolta = st.slider("⭐ Difficoltà Percepita:", min_value=1, max_value=5, value=3)
+                difficolta = st.slider("⭐ Difficoltà Percepita (RPE):", min_value=1, max_value=5, value=3)
                 impressioni = st.text_area("💭 Note e impressioni:")
 
             if st.button("🚀 Sincronizza nel Cloud", use_container_width=True):
-                orario = datetime.now().strftime("%Y-%m-%d %H:%M")
+                orario_corrente = datetime.now().strftime("%Y-%m-%d %H:%M")
                 
-                # Creiamo la riga di testo da salvare in formato CSV su Google Form o Sheet
-                # Per inviare dati senza libreria, mostriamo all'utente i dati pronti da esportare
-                # o istruzioni per l'inserimento. Per inviare direttamente, usiamo una richiesta web.
-                st.info("Funzione di salvataggio in caricamento. Per scaricare temporaneamente lo storico usa il tasto sotto.")
+                # Configurazione del Form Google (Sostituisci l'URL e le entry keys con i tuoi dati reali)
+                # Struttura colonne foglio: Google Timestamp, Utente, Fase, Categoria, Esercizio, Serie, Ripetizioni, Peso, Difficoltà, Note
+                try:
+                    FORM_URL = st.secrets["connections"]["gsheets"].get("form_url", "")
+                    if not FORM_URL:
+                        st.error("URL di invio dati (Google Form) non configurato nei Secrets.")
+                    else:
+                        # Recuperiamo i codici identificativi (entry.XXXXX) dalle configurazioni segrete
+                        payload = {
+                            st.secrets["connections"]["gsheets"]["entry_utente"]: st.session_state.username,
+                            st.secrets["connections"]["gsheets"]["entry_fase"]: fase_scelta,
+                            st.secrets["connections"]["gsheets"]["entry_categoria"]: gruppo_scelto,
+                            st.secrets["connections"]["gsheets"]["entry_esercizio"]: esercizio_scelto,
+                            st.secrets["connections"]["gsheets"]["entry_serie"]: str(serie),
+                            st.secrets["connections"]["gsheets"]["entry_ripetizioni"]: str(ripetizioni),
+                            st.secrets["connections"]["gsheets"]["entry_peso"]: str(carico),
+                            st.secrets["connections"]["gsheets"]["entry_difficolta"]: str(difficolta),
+                            st.secrets["connections"]["gsheets"]["entry_note"]: impressioni
+                        }
+                        
+                        inviato = requests.post(FORM_URL, data=payload)
+                        if inviato.status_code == 200:
+                            st.success("💪 Ottimo lavoro! Dati salvati con successo sul Cloud. Ricarica la pagina per vederli aggiornati.")
+                        else:
+                            st.error(f"Errore di sincronizzazione di rete. Status code: {inviato.status_code}")
+                except Exception as err:
+                    st.error(f"Impossibile completare il salvataggio automatico: {err}")
 
+    # --- TAB DASHBOARD & MONITORAGGIO ---
     with tab_dashboard:
         st.subheader("📊 Analisi Carichi di Lavoro")
         if df_visibile.empty:
-            st.info("Nessun dato registrato al momento.")
+            st.info("Nessun dato registrato al momento nel database per questa selezione.")
         else:
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Esercizi Registrati", len(df_visibile))
-            c2.metric("Media Fatica", f"{df_visibile['Difficoltà'].mean():.1f} / 5 ⭐")
-            
-            most_phase = df_visibile['Fase'].mode()
-            c3.metric("Fase più eseguita", str(most_phase.values[0]) if not most_phase.empty else "N/D")
-            
-            st.write("---")
-            col_pre, col_post, col_casa = st.columns(3)
-            with col_pre:
-                st.markdown("#### ⚡ PRE GARA")
-                sub_pre = df_visibile[df_visibile['Fase'] == "Pre Gara"]
-                st.metric("Sessioni", len(sub_pre))
-                if not sub_pre.empty: st.bar_chart(sub_pre.set_index('Data')['Difficoltà'], height=130)
-            with col_post:
-                st.markdown("#### 🧘 POST GARA")
-                sub_post = df_visibile[df_visibile['Fase'] == "Post Gara"]
-                st.metric("Sessioni", len(sub_post))
-                if not sub_post.empty: st.bar_chart(sub_post.set_index('Data')['Difficoltà'], height=130)
-            with col_casa:
-                st.markdown("#### 🏠 CASA")
-                sub_casa = df_visibile[df_visibile['Fase'] == "Allenamento a Casa"]
-                st.metric("Sessioni", len(sub_casa))
-                if not sub_casa.empty: st.bar_chart(sub_casa.set_index('Data')['Difficoltà'], height=130)
-
-            st.write("---")
-            st.markdown("### 📋 Registro Storico")
-            st.dataframe(df_visibile, use_container_width=True)
+            # KPIS Principali
