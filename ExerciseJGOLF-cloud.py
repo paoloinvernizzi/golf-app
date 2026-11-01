@@ -4,6 +4,10 @@ import hashlib, requests, json, time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
+# Inizializziamo un dizionario locale per salvare l'utente appena registrato in questa sessione
+if 'nuovo_utente_locale' not in st.session_state:
+    st.session_state.nuovo_utente_locale = {}
+
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in base_url else (base_url.split("edit#")[0] + "export?format=csv" if "edit#" in base_url else base_url + "/export?format=csv")
@@ -12,27 +16,31 @@ try:
 
     try:
         import random
-        # Forziamo Google a ignorare la cache lato server con parametri variabili
+        # Forziamo l'aggiornamento distruggendo la cache
         df_utenti = pd.read_csv(f"{csv_url}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}")
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Estraiamo correttamente la colonna 0 (Utente) e la colonna 1 (Password) rimuovendo gli spazi vuoti
+        # CORRETTO: Estraiamo precisamente la colonna 0 e la colonna 1
         col_user = df_utenti.columns[0]
         col_pass = df_utenti.columns[1]
         
+        # Creiamo il dizionario degli utenti online
         UTENTI_TEAM = dict(zip(
             df_utenti[col_user].astype(str).str.lower().str.strip(), 
             df_utenti[col_pass].astype(str).str.strip()
         ))
+        
+        # Integriamo gli utenti online con quelli appena registrati localmente nella sessione
+        UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+
     except Exception as errore_lettura:
-        # Se c'è un errore reale, lo stampiamo temporaneamente per capire cosa non va
-        st.sidebar.warning(f"Lettura online fallita, uso dati locali. Errore: {errore_lettura}")
+        # Se Google fallisce o è lento, usiamo i dati di backup + quelli locali della sessione
         UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
+        UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
 except Exception as e:
     st.error("Configura correttamente il link del tuo Google Sheet nei Secrets.")
     st.stop()
-
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
@@ -76,6 +84,7 @@ with st.sidebar:
                         res_reg = requests.post(url_script, data=json.dumps(payload_reg), headers={"Content-Type": "text/plain"}, allow_redirects=True)
                         res_data = res_reg.json() if res_reg.status_code == 200 else {}
                         if res_reg.status_code == 200 and res_data.get("status") != "exists":
+                            st.session_state.nuovo_utente_locale[user_in] = pass_in
                             st.success("🎉 Profilo creato! Seleziona 'Accedi' sopra per entrare.")
                         else:
                             st.error("Impossibile registrarsi: l'utente esiste già online.")
