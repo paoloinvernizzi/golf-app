@@ -8,7 +8,7 @@ import time
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
 # ==========================================
-# FUNZIONE ESTERNA DI INVIO (EVITA ERRORI DI INDENTAZIONE)
+# FUNZIONI DI SUPPORTO (EVITANO INTRECCI DI INDENTAZIONE)
 # ==========================================
 def invia_dati_cloud(url, dati):
     try:
@@ -22,7 +22,75 @@ def invia_dati_cloud(url, dati):
     except:
         return 500
 
-# 1. LETTURA DATI (ANTI-CACHE LIVE)
+def mostra_form_inserimento(esercizi_dict):
+    st.markdown("### 🎯 Seleziona la tua sessione")
+    
+    # Scelta della sessione tramite pulsanti grafici
+    card1, card2, card3 = st.columns(3)
+    with card1:
+        st.image("https://unsplash.com", caption="Mobilità e attivazione pre-round", use_container_width=True)
+        if st.button("⚡ PRE GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"):
+            st.session_state.fase_selezionata = "⚡ Pre Gara"
+            st.rerun()
+            
+    with card2:
+        st.image("https://unsplash.com", caption="Allungamento e scarico post-round", use_container_width=True)
+        if st.button("🧘 POST GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"):
+            st.session_state.fase_selezionata = "🧘 Post Gara"
+            st.rerun()
+            
+    with card3:
+        st.image("https://unsplash.com", caption="Potenziamento specifico a casa", use_container_width=True)
+        if st.button("🏠 ALLENAMENTO CASA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"):
+            st.session_state.fase_selezionata = "🏠 Allenamento a Casa"
+            st.rerun()
+
+    st.write("---")
+    st.markdown(f"#### 📋 Configura esercizio per: **{st.session_state.fase_selezionata}**")
+    
+    esercizio_scelto = st.selectbox("Seleziona l'esercizio svolto:", esercizi_dict[st.session_state.fase_selezionata])
+    
+    col_parametri1, col_parametri2 = st.columns(2)
+    with col_parametri1:
+        c_serie, c_rep = st.columns(2)
+        with c_serie:
+            serie = st.number_input("🔢 Serie eseguite:", min_value=1, value=3)
+        with c_rep:
+            ripetizioni = st.number_input("🔄 Ripetizioni / Durata (sec):", min_value=1, value=10)
+        
+        ha_peso = st.checkbox("Usi pesi / elastici?", value=("Casa" in st.session_state.fase_selezionata))
+        carico = st.number_input("⚖️ Carico (Kg):", min_value=0.0, value=0.0, step=0.5, disabled=not ha_peso)
+        
+    with col_parametri2:
+        difficolta = st.slider("⭐ Fatica Percepita (Scala RPE 1-5):", min_value=1, max_value=5, value=3)
+        impressioni = st.text_area("💭 Note, dolori o sensazioni della sessione:")
+
+    if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
+        SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
+        if not SCRIPT_URL:
+            st.error("URL dello Script non configurato nei Secrets.")
+        else:
+            payload = {
+                "utente": st.session_state.username,
+                "fase": st.session_state.fase_selezionata,
+                "categoria": "Sessione Diretta",
+                "esercizio": esercizio_scelto,
+                "serie": int(serie),
+                "ripetizioni": int(ripetizioni),
+                "peso": float(carico),
+                "difficolta": int(difficolta),
+                "note": impressioni
+            }
+            
+            status = invia_dati_cloud(SCRIPT_URL, payload)
+            if status == 200:
+                st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
+            else:
+                st.error(f"Errore di sincronizzazione. Codice: {status}")
+
+# ==========================================
+# 1. LETTURA DATI FOGLIO GOOGLE
+# ==========================================
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     if "edit?usp=sharing" in base_url:
@@ -47,7 +115,7 @@ UTENTI_TEAM = {
     "atleta3": hashlib.sha256("golf2026".encode()).hexdigest()
 }
 
-# 3. DATABASE ESERCIZI ORDINATO PER STRUTTURA AD APP
+# 3. DATABASE ESERCIZI
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": [
         "🦒 Mobilità collo (Flessione/estensione, Rotazione dx/sx)",
@@ -114,7 +182,7 @@ with st.sidebar:
             st.session_state.username = ""
             st.rerun()
 
-# 5. CONTENUTO PRINCIPALE
+# 5. STRUTTURA DELLE PAGINE PRINCIPALI
 if not st.session_state.autenticato:
     st.title("⛳ Golf Performance Hub")
     st.info("Accedi con il tuo account in sidebar per visualizzare ed inserire i tuoi dati di allenamento.")
@@ -132,74 +200,19 @@ else:
 
     tab_inserimento, tab_dashboard = st.tabs(["📝 Inserisci Allenamento", "📊 Vedi Progressi"])
 
-    # --- TAB INSERIMENTO DATI (INTERFACCIA NATIVA MOBILE) ---
+    # --- TAB INSERIMENTO DATI (CHIUSA ED ISOLATA) ---
     with tab_inserimento:
         if is_coach:
             st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare esercizi effettua l'accesso come atleta.")
         else:
-            st.markdown("### 🎯 Seleziona la tua sessione")
-            
-            card1, card2, card3 = st.columns(3)
-            with card1:
-                st.image("https://unsplash.com", caption="Mobilità e attivazione pre-round", use_container_width=True)
-                if st.button("⚡ PRE GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"):
-                    st.session_state.fase_selezionata = "⚡ Pre Gara"
-                    st.rerun()
-                    
-            with card2:
-                st.image("https://unsplash.com", caption="Allungamento e scarico post-round", use_container_width=True)
-                if st.button("🧘 POST GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"):
-                    st.session_state.fase_selezionata = "🧘 Post Gara"
-                    st.rerun()
-                    
-            with card3:
-                st.image("https://unsplash.com", caption="Potenziamento specifico a casa", use_container_width=True)
-                if st.button("🏠 ALLENAMENTO CASA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"):
-                    st.session_state.fase_selezionata = "🏠 Allenamento a Casa"
-                    st.rerun()
+            mostra_form_inserimento(DIZIONARIO_ESERCIZI)
 
-            st.write("---")
-            st.markdown(f"#### 📋 Configura esercizio per: **{st.session_state.fase_selezionata}**")
-            
-            esercizio_scelto = st.selectbox("Seleziona l'esercizio svolto:", DIZIONARIO_ESERCIZI[st.session_state.fase_selezionata])
-            
-            col_parametri1, col_parametri2 = st.columns(2)
-            with col_parametri1:
-                c_serie, c_rep = st.columns(2)
-                with c_serie:
-                    serie = st.number_input("🔢 Serie eseguite:", min_value=1, value=3)
-                with c_rep:
-                    ripetizioni = st.number_input("🔄 Ripetizioni / Durata (sec):", min_value=1, value=10)
-                
-                ha_peso = st.checkbox("Usi pesi / elastici?", value=("Casa" in st.session_state.fase_selezionata))
-                carico = st.number_input("⚖️ Carico (Kg):", min_value=0.0, value=0.0, step=0.5, disabled=not ha_peso)
-                
-            with col_parametri2:
-                difficolta = st.slider("⭐ Fatica Percepita (Scala RPE 1-5):", min_value=1, max_value=5, value=3)
-                impressioni = st.text_area("💭 Note, dolori o sensazioni della sessione:")
-
-            if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
-                SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
-                if not SCRIPT_URL:
-                    st.error("URL dello Script non configurato nei Secrets.")
-                else:
-                    payload = {
-                        "utente": st.session_state.username,
-                        "fase": st.session_state.fase_selezionata,
-                        "categoria": "Sessione Diretta",
-                        "esercizio": esercizio_scelto,
-                        "serie": int(serie),
-                        "ripetizioni": int(ripetizioni),
-                        "peso": float(carico),
-                        "difficolta": int(difficolta),
-                        "note": impressioni
-                    }
-                    
-                    status = invia_dati_cloud(SCRIPT_URL, payload)
-                    if status == 200:
-                        st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
-                    else:
-                        st.error(f"Errore di sincronizzazione. Controlla la connessione o Apps Script. Codice: {status}")
-
-    # --- TAB DASHBOARD & MONITORAGGIO ---
+    # --- TAB DASHBOARD & MONITORAGGIO (ALLINEATA AD ASSE ZERO) ---
     with tab_dashboard:
+        col_titolo, col_refresh = st.columns(2)
+        with col_titolo:
+            st.subheader("📊 Analisi Carichi di Lavoro Live")
+        with col_refresh:
+            if st.button("🔄 Aggiorna Dati", use_container_width=True):
+                st.rerun()
+                
