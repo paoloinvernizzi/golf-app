@@ -4,42 +4,46 @@ import hashlib, requests, json, time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# Inizializziamo un dizionario locale per salvare l'utente appena registrato in questa sessione
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
-    csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in base_url else (base_url.split("edit#")[0] + "export?format=csv" if "edit#" in base_url else base_url + "/export?format=csv")
-    df_completo = pd.read_csv(f"{csv_url}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
+    
+    # Pulizia robusta dell'URL per Google Sheets
+    if "edit" in base_url:
+        base_csv = base_url.split("edit")[0] + "export?format=csv"
+    else:
+        base_csv = base_url.rstrip("/") + "/export?format=csv"
+        
+    df_completo = pd.read_csv(f"{base_csv}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
     df_completo.columns = df_completo.columns.str.strip()
 
     try:
         import random
-        # Forziamo l'aggiornamento distruggendo la cache
-        df_utenti = pd.read_csv(f"{csv_url}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}")
+        # Costruzione pulita dell'URL per le credenziali
+        url_credenziali = f"{base_csv}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # CORRETTO: Estraiamo precisamente la colonna 0 e la colonna 1
-        col_user = df_utenti.columns[0]
-        col_pass = df_utenti.columns[1]
-        
-        # Creiamo il dizionario degli utenti online
-        UTENTI_TEAM = dict(zip(
-            df_utenti[col_user].astype(str).str.lower().str.strip(), 
-            df_utenti[col_pass].astype(str).str.strip()
+        # SICURO: Usiamo .iloc per prendere la prima e la seconda colonna indipendentemente dal loro nome
+        utenti_letti = dict(zip(
+            df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
+            df_utenti.iloc[:, 1].astype(str).str.strip()
         ))
         
-        # Integriamo gli utenti online con quelli appena registrati localmente nella sessione
+        UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
+        UTENTI_TEAM.update(utenti_letti)
         UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
     except Exception as errore_lettura:
-        # Se Google fallisce o è lento, usiamo i dati di backup + quelli locali della sessione
+        # Se si verifica un errore di lettura del foglio, Streamlit te lo mostrerà chiaramente
+        st.sidebar.error(f"Errore caricamento credenziali: {errore_lettura}")
         UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
         UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
 except Exception as e:
-    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets.")
+    st.error(f"Errore di configurazione generale: {e}")
     st.stop()
 
 DIZIONARIO_ESERCIZI = {
