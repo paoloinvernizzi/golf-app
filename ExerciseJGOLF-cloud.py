@@ -13,7 +13,7 @@ try:
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
     elif "edit#" in base_url:
-        csv_url = base_url.split("edit#") + "export?format=csv"
+        csv_url = base_url.split("edit#")[0] + "export?format=csv"
     else:
         csv_url = base_url + "/export?format=csv"
         
@@ -120,7 +120,7 @@ else:
     # --- TAB INSERIMENTO DATI (INTERFACCIA NATIVA MOBILE) ---
     with tab_inserimento:
         if is_coach:
-            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per inserire esercizi effettua l'accesso come atleta.")
+            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. For registrare esercizi effettua l'accesso come atleta.")
         else:
             st.markdown("### 🎯 Seleziona la tua sessione")
             
@@ -175,7 +175,7 @@ else:
                         payload = {
                             "utente": st.session_state.username,
                             "fase": st.session_state.fase_selezionata,
-                            "categoria": "Sessione Diretta", # Semplificato per l'interfaccia ad app
+                            "categoria": "Sessione Diretta",
                             "esercizio": esercizio_scelto,
                             "serie": int(serie),
                             "ripetizioni": int(ripetizioni),
