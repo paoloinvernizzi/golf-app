@@ -7,10 +7,13 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
+# Impostiamo IMMEDIATAMENTE gli utenti di backup standard
+UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
+
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     
-    # Pulizia robusta dell'URL per Google Sheets
+    # Ricostruzione sicura e robusta del link CSV di Google Sheets
     if "edit" in base_url:
         base_csv = base_url.split("edit")[0] + "export?format=csv"
     else:
@@ -21,31 +24,32 @@ try:
 
     try:
         import random
-        # Costruzione pulita dell'URL per le credenziali
+        # Tentativo di scaricare il foglio Credenziali bypassando la cache
         url_credenziali = f"{base_csv}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # CORRETTO: Estraiamo la colonna 0 e la colonna 1 usando la loro posizione numerica
-        utenti_letti = dict(zip(
-            df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
-            df_utenti.iloc[:, 1].astype(str).str.strip()
-        ))
-        
-        # Uniamo tutto nel dizionario ufficiale
-        UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
-        UTENTI_TEAM.update(utenti_letti)
-        UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+        # Verifichiamo che il foglio contenga almeno due colonne prima di procedere
+        if df_utenti.shape[1] >= 2:
+            utenti_letti = dict(zip(
+                df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
+                df_utenti.iloc[:, 1].astype(str).str.strip()
+            ))
+            # Aggiorniamo il dizionario con gli utenti appresi dal foglio online
+            UTENTI_TEAM.update(utenti_letti)
+        else:
+            st.sidebar.warning("Il foglio 'Credenziali' non ha abbastanza colonne (minimo 2).")
 
     except Exception as errore_lettura:
-        # Se si verifica un errore, Streamlit lo mostra nella sidebar per fare debug
-        st.sidebar.error(f"Errore caricamento credenziali: {errore_lettura}")
-        UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
-        UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+        # Se la lettura online fallisce, stampiamo l'errore ma lasciamo attivi gli utenti locali
+        st.sidebar.warning(f"Lettura online utenti non disponibile: {errore_lettura}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale: {e}")
+    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
     st.stop()
+
+# Integriamo in ogni caso gli utenti registrati sul momento nella sessione corrente
+UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
