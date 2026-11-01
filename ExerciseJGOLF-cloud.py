@@ -91,37 +91,36 @@ def mostra_form_inserimento(esercizi_dict):
 # 1. LETTURA DATI FOGLIO GOOGLE
 # ==========================================
 df_completo = pd.DataFrame()
+colonne_originali = []
+
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
     elif "edit#" in base_url:
-        csv_url = base_url.split("edit#")[0] + "export?format=csv"
+        csv_url = base_url.split("edit#") + "export?format=csv"
     else:
         csv_url = base_url + "/export?format=csv"
         
     live_csv_url = f"{csv_url}&nocache={int(time.time())}"
     df_completo = pd.read_csv(live_csv_url)
     
-    # Pulizia spazi nei nomi delle colonne
+    # Pulizia spazi vuoti nei nomi intestazione
     df_completo.columns = df_completo.columns.str.strip()
+    colonne_originali = list(df_completo.columns)
     
-    # ASSOCIAZIONE POSIZIONALE DI SICUREZZA (Risolto errore di indice)
-    if len(df_completo.columns) >= 5:
+    # ASSOCIAZIONE INTEGRALE AGGANCIO PER POSIZIONE FISICA DELLE COLONNE
+    if len(df_completo.columns) >= 9:
         df_completo = df_completo.rename(columns={
+            df_completo.columns[0]: 'Timestamp',
             df_completo.columns[1]: 'Utente',
             df_completo.columns[2]: 'Fase',
-            df_completo.columns[4]: 'Esercizio'
+            df_completo.columns[4]: 'Esercizio',
+            df_completo.columns[8]: 'Difficoltà'
         })
-    
-    # Controllo adattivo per la colonna difficoltà
-    for col in df_completo.columns:
-        if col.lower() in ['difficoltà', 'difficolta', 'difficoltà']:
-            df_completo = df_completo.rename(columns={col: 'Difficoltà'})
-        
 except Exception as e:
     st.error(f"Impossibile leggere i dati dal Google Sheet: {e}")
-    st.stop()
+    df_completo = pd.DataFrame(columns=['Timestamp', 'Utente', 'Fase', 'Esercizio', 'Difficoltà'])
 
 # 2. CREDENZIALI DEL TEAM
 UTENTI_TEAM = {
@@ -155,7 +154,7 @@ DIZIONARIO_ESERCIZI = {
         "↔️ Stiramento simmetrico colonna da supino",
         "🐈 Quadrupedia Gobba/Inarcamento Rachide",
         "🧘 Stiramento colonna da seduto sui talloni",
-        "⚔️ Stretching Psoas da posizione cavaliere servente",
+        "⚔️ Stretching Psoas da posizione cavalier servente",
         "🧍 Stretching Tensore Fascia Lata",
         "🪑 Stretching M. Ischio Crurale da seduto"
     ],
@@ -205,7 +204,6 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    # Sistema di filtraggio profondo anti-spazi vuoti
     if 'Utente' in df_completo.columns:
         df_completo['Utente_Lower'] = df_completo['Utente'].astype(str).str.strip().str.lower()
         if is_coach:
