@@ -1,0 +1,48 @@
+function doPost(e) {
+  var params = JSON.parse(e.postData.contents);
+  
+  // --- AZIONE 1: REGISTRAZIONE UTENTE ---
+  if (params.azione == "registrazione") {
+    // Apriamo RIGIDAMENTE il File 2 (quello delle credenziali) usando il suo ID
+    var ss_credenziali = SpreadsheetApp.openById("1yQd4fpk5wHNssAITsjSR_Fm_PTLySsoCU1WM41aMyU0");
+    var sheet = ss_credenziali.getSheets()[0]; // Prende il primo foglio del file delle credenziali
+    
+    var data = sheet.getDataRange().getValues();
+    
+    // Controlliamo se l'username esiste già
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString().toLowerCase().trim() == params.utente.toLowerCase().trim()) {
+        return ContentService.createTextOutput(JSON.stringify({"status": "exists"})).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
+    // Se non esiste, lo aggiungiamo in append nel File 2
+    sheet.appendRow([params.utente.trim(), params.password.trim()]);
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // --- AZIONE 2: SALVATAGGIO ALLENAMENTO ---
+  if (params.azione == "allenamento") {
+    // Lasciamo che scriva sul file principale (File 1) in cui lo script è installato
+    var ss_allenamenti = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss_allenamenti.getSheets()[0]; // Prende il primo foglio degli allenamenti
+    
+    var timestamp = new Date();
+    
+    // Inseriamo i dati nel foglio degli allenamenti
+    sheet.appendRow([
+      timestamp, 
+      params.utente, 
+      params.fase, 
+      params.categoria, 
+      params.esercizio, 
+      params.serie, 
+      params.ripetizioni, 
+      params.peso, 
+      params.difficolta, 
+      params.note
+    ]);
+    
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
