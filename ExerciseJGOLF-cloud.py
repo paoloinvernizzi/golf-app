@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import hashlib
 import requests
+import json
 from datetime import datetime
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
@@ -154,25 +155,31 @@ else:
 
             if st.button("🚀 Sincronizza nel Cloud", use_container_width=True):
                 try:
-                    FORM_URL = st.secrets["connections"]["gsheets"].get("form_url", "")
-                    if not FORM_URL:
-                        st.error("URL di invio dati (Google Form) non configurato nei Secrets.")
+                    SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
+                    
+                    if not SCRIPT_URL:
+                        st.error("URL dello Script (script_url) non configurato nei Secrets di Streamlit.")
                     else:
                         payload = {
-                            st.secrets["connections"]["gsheets"]["entry_utente"]: st.session_state.username,
-                            st.secrets["connections"]["gsheets"]["entry_fase"]: fase_scelta,
-                            st.secrets["connections"]["gsheets"]["entry_categoria"]: gruppo_scelto,
-                            st.secrets["connections"]["gsheets"]["entry_esercizio"]: esercizio_scelto,
-                            st.secrets["connections"]["gsheets"]["entry_serie"]: str(serie),
-                            st.secrets["connections"]["gsheets"]["entry_ripetizioni"]: str(ripetizioni),
-                            st.secrets["connections"]["gsheets"]["entry_peso"]: str(carico),
-                            st.secrets["connections"]["gsheets"]["entry_difficolta"]: str(difficolta),
-                            st.secrets["connections"]["gsheets"]["entry_note"]: impressioni
+                            "utente": st.session_state.username,
+                            "fase": fase_scelta,
+                            "categoria": gruppo_scelto,
+                            "esercizio": esercizio_scelto,
+                            "serie": int(serie),
+                            "ripetizioni": int(ripetizioni),
+                            "peso": float(carico),
+                            "difficolta": int(difficolta),
+                            "note": impressioni
                         }
                         
-                        inviato = requests.post(FORM_URL, data=payload)
+                        inviato = requests.post(
+                            SCRIPT_URL, 
+                            data=json.dumps(payload), 
+                            headers={"Content-Type": "text/plain"},
+                            allow_redirects=True
+                        )
                         if inviato.status_code == 200:
-                            st.success("💪 Ottimo lavoro! Dati salvati con successo. Ricarica la pagina per aggiornare lo storico.")
+                            st.success("💪 Dati inviati! Ricarica la pagina per aggiornare lo storico.")
                         else:
                             st.error(f"Errore di rete. Status code: {inviato.status_code}")
                 except Exception as err:
@@ -201,3 +208,5 @@ else:
             
             with col_pre:
                 st.markdown("#### ⚡ ATTIVITÀ PRE GARA")
+                sub_pre = df_visibile[df_visibile['Fase'] == "⚡ Pre Gara"] if 'Fase' in df_visibile.columns else pd.DataFrame()
+                if not sub_pre.empty:
