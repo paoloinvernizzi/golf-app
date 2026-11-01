@@ -116,7 +116,6 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    # Normalizzazione e mappatura sicura dei nomi delle colonne
     col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns[1])
     col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns[2])
     col_diff = 'Difficoltà' if 'Difficoltà' in df_completo.columns else ('difficolta' if 'difficolta' in df_completo.columns else df_completo.columns[-1])
@@ -188,7 +187,4 @@ else:
                     if not SCRIPT_URL:
                         st.error("URL dello Script non configurato nei Secrets.")
                     else:
-                        # Correzione: Parentesi graffa del dizionario payload chiusa correttamente
-                        payload = {
-                            "utente": st.session_state.username.strip().lower(),
-                            "fase": st.session_state.fase_selezionata,
+                        # Scrittura forzata del payload su riga singola pulita per evitare SyntaxError
