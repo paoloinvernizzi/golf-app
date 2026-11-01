@@ -28,6 +28,7 @@ try:
         url_credenziali = f"{base_csv}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
+        st.sidebar.write("Debug Utenti Online:", df_utenti)
         
         # Verifichiamo che il foglio contenga almeno due colonne prima di procedere
         if df_utenti.shape[1] >= 2:
