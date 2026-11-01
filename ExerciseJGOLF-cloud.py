@@ -8,7 +8,7 @@ import time
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
 # ==========================================
-# FUNZIONI DI SUPPORTO
+# FUNZIONI DI SUPPORTO (ISOLATE E COPERTE DA TRY/EXCEPT)
 # ==========================================
 def invia_dati_cloud(url, dati):
     try:
@@ -21,6 +21,25 @@ def invia_dati_cloud(url, dati):
         return inviato.status_code
     except:
         return 500
+
+def ricava_csv_url():
+    """Genera l'URL di download CSV in modo sicuro senza rischiare crash di stringa"""
+    try:
+        if "connections" in st.secrets and "gsheets" in st.secrets["connections"] and "url" in st.secrets["connections"]["gsheets"]:
+            base_url = st.secrets["connections"]["gsheets"]["url"]
+            if not base_url:
+                return None
+            if "edit?usp=sharing" in base_url:
+                return base_url.replace("edit?usp=sharing", "export?format=csv")
+            elif "edit#" in base_url:
+                return base_url.split("edit#")[0] + "export?format=csv"
+            elif "/export" in base_url:
+                return base_url
+            else:
+                return base_url.rstrip("/") + "/export?format=csv"
+    except:
+        pass
+    return None
 
 def mostra_form_inserimento(esercizi_dict):
     st.markdown("### 🎯 Seleziona la tua sessione")
@@ -53,76 +72,75 @@ def mostra_form_inserimento(esercizi_dict):
     with col_parametri1:
         c_serie, c_rep = st.columns(2)
         with c_serie:
-            serie = st.number_input("🔢 Serie eseguite:", min_value=1, value=3)
+            serie = st.number_input("🔢 Serie eseguite:", min_value=1, value=3, key="form_serie")
         with c_rep:
-            ripetizioni = st.number_input("🔄 Ripetizioni / Durata (sec):", min_value=1, value=10)
+            ripetizioni = st.number_input("🔄 Ripetizioni / Durata (sec):", min_value=1, value=10, key="form_rep")
         
-        ha_peso = st.checkbox("Usi pesi / elastici?", value=("Casa" in st.session_state.fase_selezionata))
-        carico = st.number_input("⚖️ Carico (Kg):", min_value=0.0, value=0.0, step=0.5, disabled=not ha_peso)
+        ha_peso = st.checkbox("Usi pesi / elastici?", value=("Casa" in st.session_state.fase_selezionata), key="form_ha_peso")
+        carico = st.number_input("⚖️ Carico (Kg):", min_value=0.0, value=0.0, step=0.5, disabled=not ha_peso, key="form_carico")
         
     with col_parametri2:
-        difficolta = st.slider("⭐ Fatica Percepita (Scala RPE 1-5):", min_value=1, max_value=5, value=3)
-        impressioni = st.text_area("💭 Note, dolori o sensazioni della sessione:")
+        difficolta = st.slider("⭐ Fatica Percepita (Scala RPE 1-5):", min_value=1, max_value=5, value=3, key="form_diff")
+        impressioni = st.text_area("💭 Note, dolori o sensazioni della sessione:", key="form_note")
 
     if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
-        SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
-        if not SCRIPT_URL:
-            st.error("URL dello Script non configurato nei Secrets.")
-        else:
-            payload = {
-                "utente": st.session_state.username.strip().lower(),
-                "fase": st.session_state.fase_selezionata,
-                "categoria": "Sessione Diretta",
-                "esercizio": esercizio_scelto,
-                "serie": int(serie),
-                "ripetizioni": int(ripetizioni),
-                "peso": float(carico),
-                "difficolta": int(difficolta),
-                "note": impressioni
-            }
-            
-            status = invia_dati_cloud(SCRIPT_URL, payload)
-            if status == 200:
-                st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
+        try:
+            SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
+            if not SCRIPT_URL:
+                st.error("URL dello Script non configurato nei Secrets.")
             else:
-                st.error(f"Errore di sincronizzazione. Codice: {status}")
+                payload = {
+                    "utente": st.session_state.username.strip().lower(),
+                    "fase": st.session_state.fase_selezionata,
+                    "categoria": "Sessione Diretta",
+                    "esercizio": esercizio_scelto,
+                    "serie": int(serie),
+                    "ripetizioni": int(ripetizioni),
+                    "peso": float(carico),
+                    "difficolta": int(difficolta),
+                    "note": impressioni
+                }
+                
+                status = invia_dati_cloud(SCRIPT_URL, payload)
+                if status == 200:
+                    st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
+                else:
+                    st.error(f"Errore di sincronizzazione. Codice: {status}")
+        except Exception as e:
+            st.error(f"Errore durante l'invio: {e}")
 
 # ==========================================
-# 1. LETTURA DATI FOGLIO GOOGLE
+# 1. CARICAMENTO DATI DA CLOUD (BLINDATO)
 # ==========================================
 df_completo = pd.DataFrame()
-colonne_originali = []
+colonne_rilevate = []
+link_csv = ricava_csv_url()
 
-try:
-    base_url = st.secrets["connections"]["gsheets"]["url"]
-    if "edit?usp=sharing" in base_url:
-        csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
-    elif "edit#" in base_url:
-        csv_url = base_url.split("edit#") + "export?format=csv"
-    else:
-        csv_url = base_url + "/export?format=csv"
-        
-    live_csv_url = f"{csv_url}&nocache={int(time.time())}"
-    df_completo = pd.read_csv(live_csv_url)
-    
-    # Pulizia spazi vuoti nei nomi intestazione
-    df_completo.columns = df_completo.columns.str.strip()
-    colonne_originali = list(df_completo.columns)
-    
-    # ASSOCIAZIONE INTEGRALE AGGANCIO PER POSIZIONE FISICA DELLE COLONNE
-    if len(df_completo.columns) >= 9:
-        df_completo = df_completo.rename(columns={
-            df_completo.columns[0]: 'Timestamp',
-            df_completo.columns[1]: 'Utente',
-            df_completo.columns[2]: 'Fase',
-            df_completo.columns[4]: 'Esercizio',
-            df_completo.columns[8]: 'Difficoltà'
-        })
-except Exception as e:
-    st.error(f"Impossibile leggere i dati dal Google Sheet: {e}")
-    df_completo = pd.DataFrame(columns=['Timestamp', 'Utente', 'Fase', 'Esercizio', 'Difficoltà'])
+if link_csv:
+    try:
+        live_csv_url = f"{link_csv}&nocache={int(time.time())}"
+        df_grezzo = pd.read_csv(live_csv_url)
+        if not df_grezzo.empty:
+            df_grezzo.columns = df_grezzo.columns.str.strip()
+            colonne_rilevate = list(df_grezzo.columns)
+            
+            # Mappatura posizionale sicura
+            mappa = {}
+            if len(df_grezzo.columns) >= 2: mappa[df_grezzo.columns[1]] = 'Utente'
+            if len(df_grezzo.columns) >= 3: mappa[df_grezzo.columns[2]] = 'Fase'
+            if len(df_grezzo.columns) >= 5: mappa[df_grezzo.columns[4]] = 'Esercizio'
+            
+            for c in df_grezzo.columns:
+                if c.lower() in ['difficoltà', 'difficolta', 'diffic']:
+                    mappa[c] = 'Difficoltà'
+            
+            df_completo = df_grezzo.rename(columns=mappa)
+    except:
+        pass
 
-# 2. CREDENZIALI DEL TEAM
+# ==========================================
+# 2. SISTEMA DI CONFIGURAZIONE TEAM
+# ==========================================
 UTENTI_TEAM = {
     "coach": hashlib.sha256("coachmaster".encode()).hexdigest(),
     "atleta1": hashlib.sha256("golf2026".encode()).hexdigest(),
@@ -130,7 +148,6 @@ UTENTI_TEAM = {
     "atleta3": hashlib.sha256("golf2026".encode()).hexdigest()
 }
 
-# 3. DATABASE ESERCIZI
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": [
         "🦒 Mobilità collo (Flessione/estensione, Rotazione dx/sx)",
@@ -176,12 +193,14 @@ if 'username' not in st.session_state:
 if 'fase_selezionata' not in st.session_state:
     st.session_state.fase_selezionata = "⚡ Pre Gara"
 
-# 4. SIDEBAR DI LOG-IN
+# ==========================================
+# 3. INTERFACCIA UTENTE (SIDEBAR & SCHERMATA LOGIN)
+# ==========================================
 with st.sidebar:
     st.header("🔐 Accesso Team")
     if not st.session_state.autenticato:
-        user_in = st.text_input("Username Atleta:").strip().lower()
-        pass_in = st.text_input("Password:", type="password")
+        user_in = st.text_input("Username Atleta:", key="login_user").strip().lower()
+        pass_in = st.text_input("Password:", type="password", key="login_pass")
         if st.button("Accedi al Cloud", use_container_width=True):
             hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
             if user_in in UTENTI_TEAM and UTENTI_TEAM[user_in] == hash_in:
@@ -197,22 +216,3 @@ with st.sidebar:
             st.session_state.username = ""
             st.rerun()
 
-# 5. STRUTTURA DELLE PAGINE PRINCIPALI
-if not st.session_state.autenticato:
-    st.title("⛳ Golf Performance Hub")
-    st.info("Accedi con il tuo account in sidebar per visualizzare ed inserire i tuoi dati di allenamento.")
-else:
-    is_coach = (st.session_state.username == "coach")
-    
-    if 'Utente' in df_completo.columns:
-        df_completo['Utente_Lower'] = df_completo['Utente'].astype(str).str.strip().str.lower()
-        if is_coach:
-            st.title("👨‍🏫 Pannello Coach (Visione Globale)")
-            elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
-            utente_selezionato = st.selectbox("Seleziona atleta da monitorare:", elenco_atleti)
-            if utente_selezionato == "Tutti":
-                df_visibile = df_completo
-            else:
-                df_visibile = df_completo[df_completo['Utente_Lower'] == utente_selezionato.lower().strip()]
-        else:
-            st.title(f"⛳ Golf Performance Cloud")
