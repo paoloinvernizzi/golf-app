@@ -4,17 +4,25 @@ import hashlib, requests, json, time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-try:
-    base_url = st.secrets["connections"]["gsheets"]["url"]
-    csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in base_url else (base_url.split("edit#")[0] + "export?format=csv" if "edit#" in base_url else base_url + "/export?format=csv")
-    df_completo = pd.read_csv(f"{csv_url}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
-    df_completo.columns = df_completo.columns.str.strip()
     try:
-        df_utenti = pd.read_csv(f"{csv_url}&sheet=Credenziali&nocache={int(time.time())}")
+        import random
+        # Forziamo Google a ignorare la cache lato server con due parametri variabili
+        df_utenti = pd.read_csv(f"{csv_url}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}")
         df_utenti.columns = df_utenti.columns.str.strip()
-        UTENTI_TEAM = dict(zip(df_utenti[df_utenti.columns[0]].astype(str).str.lower().str.strip(), df_utenti[df_utenti.columns[1]].astype(str).str.strip()))
-    except:
+        
+        # Estraiamo correttamente la colonna 0 (Utente) e la colonna 1 (Password) rimuovendo gli spazi vuoti
+        col_user = df_utenti.columns[0]
+        col_pass = df_utenti.columns[1]
+        
+        UTENTI_TEAM = dict(zip(
+            df_utenti[col_user].astype(str).str.lower().str.strip(), 
+            df_utenti[col_pass].astype(str).str.strip()
+        ))
+    except Exception as errore_lettura:
+        # Se c'è un errore reale, lo stampiamo temporaneamente per capire cosa non va
+        st.sidebar.warning(f"Lettura online fallita, uso dati locali. Errore: {errore_lettura}")
         UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
+
 except Exception as e:
     st.error("Configura correttamente il link del tuo Google Sheet nei Secrets.")
     st.stop()
