@@ -7,7 +7,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# 1. LETTURA DATI (DA GOOGLE SHEET IN MODALITÀ PUBBLICA CSV)
+# 1. LETTURA DATI (DA GOOGLE SHEET IN MODALITÀ PUBBLICA CSV - CON FORZATURA LIVE)
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     if "edit?usp=sharing" in base_url:
@@ -17,11 +17,17 @@ try:
     else:
         csv_url = base_url + "/export?format=csv"
         
-    df_completo = pd.read_csv(csv_url)
+    # Trucco anti-cache: aggiungiamo un parametro temporale casuale in fondo al link
+    # Questo costringe Google a restituire i dati aggiornati al millisecondo
+    import time
+    live_csv_url = f"{csv_url}&nocache={int(time.time())}"
+    
+    df_completo = pd.read_csv(live_csv_url)
     df_completo.columns = df_completo.columns.str.strip()
 except Exception as e:
     st.error("Configura correttamente il link del tuo Google Sheet nei Secrets di Streamlit.")
     st.stop()
+
 
 # 2. CREDENZIALI DEL TEAM (Crypto SHA-256)
 UTENTI_TEAM = {
