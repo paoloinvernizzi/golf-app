@@ -8,7 +8,7 @@ import time
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
 # ==========================================
-# FUNZIONI DI SUPPORTO (EVITANO INTRECCI DI INDENTAZIONE)
+# FUNZIONI DI SUPPORTO
 # ==========================================
 def invia_dati_cloud(url, dati):
     try:
@@ -25,7 +25,6 @@ def invia_dati_cloud(url, dati):
 def mostra_form_inserimento(esercizi_dict):
     st.markdown("### 🎯 Seleziona la tua sessione")
     
-    # Scelta della sessione tramite pulsanti grafici
     card1, card2, card3 = st.columns(3)
     with card1:
         st.image("https://unsplash.com", caption="Mobilità e attivazione pre-round", use_container_width=True)
@@ -71,7 +70,7 @@ def mostra_form_inserimento(esercizi_dict):
             st.error("URL dello Script non configurato nei Secrets.")
         else:
             payload = {
-                "utente": st.session_state.username,
+                "utente": st.session_state.username.strip().lower(),
                 "fase": st.session_state.fase_selezionata,
                 "categoria": "Sessione Diretta",
                 "esercizio": esercizio_scelto,
@@ -91,20 +90,38 @@ def mostra_form_inserimento(esercizi_dict):
 # ==========================================
 # 1. LETTURA DATI FOGLIO GOOGLE
 # ==========================================
+df_completo = pd.DataFrame()
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
     elif "edit#" in base_url:
-        csv_url = base_url.split("edit#")[0] + "export?format=csv"
+        csv_url = base_url.split("edit#") + "export?format=csv"
     else:
         csv_url = base_url + "/export?format=csv"
         
     live_csv_url = f"{csv_url}&nocache={int(time.time())}"
     df_completo = pd.read_csv(live_csv_url)
+    
+    # Pulizia spazi nei nomi delle colonne
     df_completo.columns = df_completo.columns.str.strip()
+    
+    # ASSOCIAZIONE POSIZIONALE DI SICUREZZA
+    # Se i nomi cambiano, forziamo le colonne in base al loro ordine fisico nel foglio Excel
+    if len(df_completo.columns) >= 5:
+        df_completo = df_completo.rename(columns={
+            df_completo.columns[1]: 'Utente',
+            df_completo.columns[2]: 'Fase',
+            df_completo.columns[4]: 'Esercizio'
+        })
+    
+    # Controllo per la colonna difficoltà
+    for col in df_completo.columns:
+        if col.lower() in ['difficoltà', 'difficolta', 'difficoltà']:
+            df_completo = df_completo.rename(columns={col: 'Difficoltà'})
+        
 except Exception as e:
-    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets di Streamlit.")
+    st.error(f"Impossibile leggere i dati dal Google Sheet: {e}")
     st.stop()
 
 # 2. CREDENZIALI DEL TEAM
@@ -176,7 +193,7 @@ with st.sidebar:
             else:
                 st.error("Credenziali non valide.")
     else:
-        st.success(f"🌐 Utente: {st.session_state.username}")
+        st.success(f"🌐 Utente: {st.session_state.username.upper()}")
         if st.button("🚪 Esci", use_container_width=True):
             st.session_state.autenticato = False
             st.session_state.username = ""
@@ -189,30 +206,16 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    if is_coach:
-        st.title("👨‍🏫 Pannello Coach (Visione Globale)")
-        elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
-        utente_selezionato = st.selectbox("Seleziona atleta da monitorare:", elenco_atleti)
-        df_visibile = df_completo if utente_selezionato == "Tutti" else df_completo[df_completo['Utente'] == utente_selezionato]
-    else:
-        st.title(f"⛳ Golf Performance Cloud")
-        df_visibile = df_completo[df_completo['Utente'] == st.session_state.username]
-
-    tab_inserimento, tab_dashboard = st.tabs(["📝 Inserisci Allenamento", "📊 Vedi Progressi"])
-
-    # --- TAB INSERIMENTO DATI (CHIUSA ED ISOLATA) ---
-    with tab_inserimento:
+    # Applicazione del filtro anti-errore
+    if 'Utente' in df_completo.columns:
+        df_completo['Utente_Lower'] = df_completo['Utente'].astype(str).str.strip().str.lower()
         if is_coach:
-            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare esercizi effettua l'accesso come atleta.")
+            st.title("👨‍🏫 Pannello Coach (Visione Globale)")
+            elenco_atleti = ["Tutti"] + [u for u in UTENTI_TEAM.keys() if u != "coach"]
+            utente_selezionato = st.selectbox("Seleziona atleta da monitorare:", elenco_atleti)
+            if utente_selezionato == "Tutti":
+                df_visibile = df_completo
+            else:
+                df_visibile = df_completo[df_completo['Utente_Lower'] == utente_selezionato.lower().strip()]
         else:
-            mostra_form_inserimento(DIZIONARIO_ESERCIZI)
-
-    # --- TAB DASHBOARD & MONITORAGGIO (ALLINEATA AD ASSE ZERO) ---
-    with tab_dashboard:
-        col_titolo, col_refresh = st.columns(2)
-        with col_titolo:
-            st.subheader("📊 Analisi Carichi di Lavoro Live")
-        with col_refresh:
-            if st.button("🔄 Aggiorna Dati", use_container_width=True):
-                st.rerun()
-                
+            st.title(f"⛳ Golf Performance Cloud")
