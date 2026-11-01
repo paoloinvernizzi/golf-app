@@ -11,45 +11,48 @@ if 'nuovo_utente_locale' not in st.session_state:
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
-    base_url = st.secrets["connections"]["gsheets"]["url"]
+    url_grezzo = st.secrets["connections"]["gsheets"]["url"]
     
-    # PULIZIA URL SICURA: Rimuoviamo la parte finale dopo l'ID del foglio
-    if "/edit" in base_url:
-        link_pulito = base_url.split("/edit")[0]
+    # PULIZIA TOTALE: Isoliamo esclusivamente l'ID del documento (stringa tra /d/ e /edit)
+    # Questo elimina alla radice qualsiasi vecchio gid o parametro ereditato dai Secrets
+    if "/d/" in url_grezzo:
+        doc_id = url_grezzo.split("/d/")[1].split("/")[0]
+        base_link = f"https://google.com{doc_id}"
     else:
-        link_pulito = base_url.rstrip("/")
-        
-    # 1. LETTURA SCHEDA ALLENAMENTI (Forzata su gid=0 come da screenshot)
-    url_allenamenti = f"{link_pulito}/export?format=csv&gid=0&nocache={int(time.time())}"
+        base_link = url_grezzo.split("?")[0].rstrip("/")
+
+    # 1. LETTURA RIGIDA SCHEDA ALLENAMENTI (Forzata sulla prima scheda gid=0)
+    url_allenamenti = f"{base_link}/export?format=csv&gid=0&nocache={int(time.time())}"
     df_completo = pd.read_csv(url_allenamenti)
     df_completo.columns = df_completo.columns.str.strip()
 
     try:
         import random
-        # 2. LETTURA SCHEDA CREDENZIALI (Utilizziamo l'endpoint gviz filtrando rigorosamente per nome)
-        url_credenziali = f"{link_pulito}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        # 2. LETTURA RIGIDA SCHEDA CREDENZIALI (Usiamo l'endpoint gviz sul link pulito)
+        url_credenziali = f"{base_link}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # CONTROLLO: Se la tabella scaricata contiene dati di allenamento, Google ha sbagliato foglio
+        # Verifichiamo che la tabella scaricata sia effettivamente quella delle credenziali
         if df_utenti.shape[1] >= 2 and "Fase" not in df_utenti.columns and "Timestamp" not in df_utenti.columns:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
             ))
             UTENTI_TEAM.update(utenti_letti)
+        else:
+            st.sidebar.warning("⚠️ La scheda 'Credenziali' non è stata letta correttamente. Controlla il nome sul foglio.")
             
     except Exception as errore_lettura:
         st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
+    st.error(f"Errore di configurazione generale: {e}")
     st.stop()
 
 # Uniamo gli utenti registrati sul momento nella sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
-
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
