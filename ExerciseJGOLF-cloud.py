@@ -1,66 +1,51 @@
 import streamlit as st
 import pandas as pd
 import hashlib, requests, json, time
-from urllib.parse import urlparse
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
-# Impostiamo gli utenti fissi locali di backup
+# Utenti locali fissi di backup
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
-    url_grezzo = st.secrets["connections"]["gsheets"]["url"]
+    # 1. LETTURA FILE ALLENAMENTI (File Principale)
+    url_all_grezzo = st.secrets["connections"]["gsheets"]["url"]
+    csv_url_all = url_all_grezzo.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in url_all_grezzo else (url_all_grezzo.split("edit#")[0] + "export?format=csv" if "edit#" in url_all_grezzo else url_all_grezzo + "/export?format=csv")
     
-    # 1. PARSING ROBUSTO: Estraiamo l'ID del foglio in modo sicuro e infallibile
-    url_pasticciato = urlparse(url_grezzo)
-    percorso = url_pasticciato.path.split('/')
-    
-    # Cerchiamo la stringa alfanumerica dopo il segmento '/d/'
-    if 'd' in percorso:
-        idx = percorso.index('d')
-        doc_id = percorso[idx + 1]
-    else:
-        # Se il link è un formato alternativo, ripuliamo i parametri di query
-        doc_id = url_grezzo.split('?')[0].split('/')[-1]
-    
-    # Ricostruiamo la radice pulita dell'URL del documento
-    base_link = f"https://google.com{doc_id}"
-
-    # 2. LETTURA RIGIDA SCHEDA ALLENAMENTI (Forzata sulla prima scheda gid=0)
-    url_allenamenti = f"{base_link}/export?format=csv&gid=0&nocache={int(time.time())}"
-    df_completo = pd.read_csv(url_allenamenti)
+    df_completo = pd.read_csv(f"{csv_url_all}&nocache={int(time.time())}")
     df_completo.columns = df_completo.columns.str.strip()
 
+    # 2. LETTURA FILE CREDENZIALI SEPARATO (Nuovo File)
     try:
         import random
-        # 3. LETTURA RIGIDA SCHEDA CREDENZIALI (Utilizziamo il motore grafico gviz per nome)
-        url_credenziali = f"{base_link}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        url_cred_grezzo = st.secrets["connections"]["gsheets"]["url_credenziali"]
+        csv_url_cred = url_cred_grezzo.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in url_cred_grezzo else (url_cred_grezzo.split("edit#")[0] + "export?format=csv" if "edit#" in url_cred_grezzo else url_cred_grezzo + "/export?format=csv")
         
-        df_utenti = pd.read_csv(url_credenziali)
+        df_utenti = pd.read_csv(f"{csv_url_cred}&nocache={int(time.time())}&r={random.randint(1,9999)}")
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Verifichiamo che la tabella scaricata non contenga i dati della scheda sbagliata
-        if df_utenti.shape[1] >= 2 and "Fase" not in df_utenti.columns and "Timestamp" not in df_utenti.columns:
+        # Estraiamo in sicurezza username e password dalle prime due colonne del nuovo file
+        if df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
             ))
             UTENTI_TEAM.update(utenti_letti)
-        else:
-            st.sidebar.warning("⚠️ Google Sheets non ha servito la scheda 'Credenziali'. Verranno usati i dati di backup.")
             
-    except Exception as errore_lettura:
-        st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
+    except Exception as errore_cred:
+        # Se il secondo file non è ancora configurato o ha problemi, l'app si avvia comunque con atleta1
+        st.sidebar.warning(f"Ricezione credenziali online non attiva: {errore_cred}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
+    st.error(f"Errore di configurazione generale: {e}")
     st.stop()
 
 # Uniamo gli utenti registrati sul momento nella sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
