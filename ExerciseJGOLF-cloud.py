@@ -26,18 +26,19 @@ try:
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # SICURO: Usiamo .iloc per prendere la prima e la seconda colonna indipendentemente dal loro nome
+        # CORRETTO: Estraiamo la colonna 0 e la colonna 1 usando la loro posizione numerica
         utenti_letti = dict(zip(
             df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
             df_utenti.iloc[:, 1].astype(str).str.strip()
         ))
         
+        # Uniamo tutto nel dizionario ufficiale
         UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
         UTENTI_TEAM.update(utenti_letti)
         UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
     except Exception as errore_lettura:
-        # Se si verifica un errore di lettura del foglio, Streamlit te lo mostrerà chiaramente
+        # Se si verifica un errore, Streamlit lo mostra nella sidebar per fare debug
         st.sidebar.error(f"Errore caricamento credenziali: {errore_lettura}")
         UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
         UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
