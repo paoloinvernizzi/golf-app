@@ -13,31 +13,42 @@ UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     
-    # 1. Puliamo il link di base rimuovendo qualsiasi parametro finale (edit, gid, ecc.)
-    link_pulito = base_url.split("/edit")[0] if "/edit" in base_url else base_url.rstrip("/")
+    # Puliamo il link separando la parte ID del documento da tutto il resto
+    if "/edit" in base_url:
+        doc_id = base_url.split("/d/")[1].split("/edit")[0]
+    else:
+        doc_id = base_url.split("/d/")[1].strip("/")
+        
+    # Costruiamo la radice pulita dell'URL del documento
+    link_pulito = f"https://docs.google.com/spreadsheets/d/{doc_id}"
     
-    # 2. URL per la scheda Risposte del modulo 1 (Forziamo gid=0)
+    # 1. Lettura sicura della prima scheda (Risposte del modulo 1) tramite gid=0
     url_allenamenti = f"{link_pulito}/export?format=csv&gid=0&nocache={int(time.time())}"
     df_completo = pd.read_csv(url_allenamenti)
     df_completo.columns = df_completo.columns.str.strip()
 
     try:
         import random
-        # 3. URL per la scheda Credenziali usando il suo ID specifico ricavato dal foglio
-        # Utilizziamo il parametro corretto di Google: 'gid' al posto di 'sheet'
-        url_credenziali = f"{link_pulito}/export?format=csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        # 2. METODO INFALLIBILE: Usiamo gviz/tq per richiedere la scheda 'Credenziali' per nome testuale
+        url_credenziali = f"{link_pulito}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
-        st.sidebar.write("Debug Utenti Online:", df_utenti)
-        # Verifichiamo che la struttura della tabella sia corretta prima di estrarre le credenziali
-        if "Username" in df_utenti.columns or df_utenti.shape[1] >= 2:
+        
+        # Estraiamo le credenziali basandoci sulla posizione numerica delle colonne
+        if df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
+                # --- RIGA DI DIAGNOSTICA TEMPORANEA ---
+                # Questo mostrerà nella barra laterale cosa c'è DAVVERO nel foglio Credenziali online
+                st.sidebar.write("Debug Utenti Online:", df_utenti)
+
             ))
             # Sincronizziamo i dati online nel dizionario dell'applicazione
             UTENTI_TEAM.update(utenti_letti)
+        else:
+            st.sidebar.warning("La tabella delle Credenziali non ha abbastanza colonne valide.")
             
     except Exception as errore_lettura:
         st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
