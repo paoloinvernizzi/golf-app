@@ -160,4 +160,4 @@ if col_diff in df_visibile.columns:
 df_visibile[col_diff] = pd.to_numeric(df_visibile[col_diff], errors='coerce')
 k2.metric("Media Fatica Percepita", f"{df_visibile[col_diff].mean():.1f} / 5 ⭐")
 st.write("---")
-st.dataframe(df_visibile, use_container_width=True)"""
+st.dataframe(df_visibile, use_container_width=True)
