@@ -59,7 +59,6 @@ except Exception as e:
 # Uniamo gli utenti della sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
-
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
     "🧘 Post Gara": ["🤚 Stretching Mani", "💪 Stretching Avambraccio", "🚪 Stretching Pettorale", "📐 Stretching Dorsale", "🏹 Stretching Tricipite", "🛌 Stretching Piriforme", "↔️ Stiramento colonna", "🐈 Quadrupedia Gobba", "🧘 Seduto talloni", "🧍 Stretching Psoas"],
