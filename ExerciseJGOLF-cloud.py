@@ -13,14 +13,12 @@ UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     
-    # Estraiamo l'ID pulito del documento Google Sheet
-    if "/d/" in base_url:
-        doc_id = base_url.split("/d/")[1].split("/")[0]
+    # PULIZIA URL SICURA: Rimuoviamo la parte finale dopo l'ID del foglio
+    if "/edit" in base_url:
+        link_pulito = base_url.split("/edit")[0]
     else:
-        doc_id = base_url.strip("/")
+        link_pulito = base_url.rstrip("/")
         
-    link_pulito = f"https://google.com{doc_id}"
-    
     # 1. LETTURA SCHEDA ALLENAMENTI (Forzata su gid=0 come da screenshot)
     url_allenamenti = f"{link_pulito}/export?format=csv&gid=0&nocache={int(time.time())}"
     df_completo = pd.read_csv(url_allenamenti)
@@ -28,21 +26,14 @@ try:
 
     try:
         import random
-        # 2. LETTURA SCHEDA CREDENZIALI TRAMITE IL SUO GID NUMERICO SPECIFICO
-        # Sostituisci 0 con il numero esatto di gid della scheda Credenziali che vedi nell'URL del browser
-        gid_credenziali = "0" # <-- INSERISCI QUI IL NUMERO DI GID DI CREDENZIALI (es: "14567823")
+        # 2. LETTURA SCHEDA CREDENZIALI (Utilizziamo l'endpoint gviz filtrando rigorosamente per nome)
+        url_credenziali = f"{link_pulito}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         
-        if gid_credenziali == "0" or gid_credenziali == 0:
-            # Se lasciamo 0 o usiamo il nome testo, usiamo l'endpoint gviz che seleziona esplicitamente per nome
-            url_credenziali = f"{link_pulito}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}"
-        else:
-            url_credenziali = f"{link_pulito}/export?format=csv&gid={gid_credenziali}&nocache={int(time.time())}"
-            
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Verifichiamo che stiamo leggendo il foglio giusto analizzando i dati
-        if df_utenti.shape >= 2 and "Fase" not in df_utenti.columns:
+        # CONTROLLO: Se la tabella scaricata contiene dati di allenamento, Google ha sbagliato foglio
+        if df_utenti.shape[1] >= 2 and "Fase" not in df_utenti.columns and "Timestamp" not in df_utenti.columns:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
@@ -53,11 +44,12 @@ try:
         st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale: {e}")
+    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
     st.stop()
 
-# Uniamo gli utenti della sessione corrente
+# Uniamo gli utenti registrati sul momento nella sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
