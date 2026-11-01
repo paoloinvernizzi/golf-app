@@ -7,27 +7,33 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
-# Utenti locali fissi di backup
+# Utenti fissi di emergenza
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
-    # 1. LETTURA FILE ALLENAMENTI (File Principale)
+    # 1. LEGGE IL FILE DEGLI ALLENAMENTI
     url_all_grezzo = st.secrets["connections"]["gsheets"]["url"]
-    csv_url_all = url_all_grezzo.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in url_all_grezzo else (url_all_grezzo.split("edit#")[0] + "export?format=csv" if "edit#" in url_all_grezzo else url_all_grezzo + "/export?format=csv")
-    
+    if "/edit" in url_all_grezzo:
+        csv_url_all = url_all_grezzo.split("/edit")[0] + "/export?format=csv&gid=0"
+    else:
+        csv_url_all = url_all_grezzo.rstrip("/") + "/export?format=csv&gid=0"
+        
     df_completo = pd.read_csv(f"{csv_url_all}&nocache={int(time.time())}")
     df_completo.columns = df_completo.columns.str.strip()
 
-    # 2. LETTURA FILE CREDENZIALI SEPARATO (Nuovo File)
+    # 2. LEGGE IL NUOVO FILE DELLE PASSWORD (CREDENZIALI)
     try:
         import random
         url_cred_grezzo = st.secrets["connections"]["gsheets"]["url_credenziali"]
-        csv_url_cred = url_cred_grezzo.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in url_cred_grezzo else (url_cred_grezzo.split("edit#")[0] + "export?format=csv" if "edit#" in url_cred_grezzo else url_cred_grezzo + "/export?format=csv")
-        
+        if "/edit" in url_cred_grezzo:
+            csv_url_cred = url_cred_grezzo.split("/edit")[0] + "/export?format=csv&gid=0"
+        else:
+            csv_url_cred = url_cred_grezzo.rstrip("/") + "/export?format=csv&gid=0"
+            
         df_utenti = pd.read_csv(f"{csv_url_cred}&nocache={int(time.time())}&r={random.randint(1,9999)}")
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Estraiamo in sicurezza username e password dalle prime due colonne del nuovo file
+        # Prende la colonna A (utenti) e la colonna B (password) dal nuovo foglio
         if df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
@@ -36,16 +42,13 @@ try:
             UTENTI_TEAM.update(utenti_letti)
             
     except Exception as errore_cred:
-        # Se il secondo file non è ancora configurato o ha problemi, l'app si avvia comunque con atleta1
-        st.sidebar.warning(f"Ricezione credenziali online non attiva: {errore_cred}")
+        st.sidebar.warning(f"Controllo password online non attivo: {errore_cred}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale: {e}")
+    st.error(f"Errore di configurazione: {e}")
     st.stop()
 
-# Uniamo gli utenti registrati sul momento nella sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
-
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
