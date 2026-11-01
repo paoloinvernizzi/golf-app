@@ -138,11 +138,11 @@ else:
                     url_script = st.secrets["connections"]["gsheets"]["script_url"]
                     payload = {"azione": "allenamento", "utente": st.session_state.username, "fase": st.session_state.fase_selezionata, "categoria": "Sessione Diretta", "esercizio": st.session_state.esercizio_selezionato, "serie": int(serie), "ripetizioni": int(ripetizioni), "peso": float(carico), "difficolta": int(difficolta), "note": impressioni}
                     res = requests.post(url_script, data=json.dumps(payload), headers={"Content-Type": "text/plain"}, allow_redirects=True)
-if res.status_code == 200:
-st.success("💪 Ottimo lavoro! Sessione salvata nel Cloud.")
-else:
-st.error(f"Errore di rete. Codice: {res.status_code}")
-except Exception as err:
+            if res.status_code == 200:
+                st.success("💪 Ottimo lavoro! Sessione salvata nel Cloud.")
+            else:
+                st.error(f"Errore di rete. Codice: {res.status_code}")
+            except Exception as err:
 st.error(f"Impossibile salvare: {err}")
 with tab_dashboard:
 t_col, r_col = st.columns(2)
