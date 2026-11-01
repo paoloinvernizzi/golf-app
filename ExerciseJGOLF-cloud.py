@@ -29,7 +29,7 @@ try:
         
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
-        
+        st.sidebar.write("Debug Utenti Online:", df_utenti)
         # Verifichiamo che la struttura della tabella sia corretta prima di estrarre le credenziali
         if "Username" in df_utenti.columns or df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
