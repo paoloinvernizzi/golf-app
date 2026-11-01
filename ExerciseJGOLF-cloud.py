@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import hashlib, requests, json, time
+from urllib.parse import urlparse
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
@@ -13,21 +14,29 @@ UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 try:
     url_grezzo = st.secrets["connections"]["gsheets"]["url"]
     
-    # PULIZIA URL SICURA: Estraiamo l'ID unico del foglio senza rompere l'indirizzo
-    if "/d/" in url_grezzo:
-        doc_id = url_grezzo.split("/d/")[1].split("/")[0]
-        base_link = f"https://google.com{doc_id}"
+    # 1. PARSING ROBUSTO: Estraiamo l'ID del foglio in modo sicuro e infallibile
+    url_pasticciato = urlparse(url_grezzo)
+    percorso = url_pasticciato.path.split('/')
+    
+    # Cerchiamo la stringa alfanumerica dopo il segmento '/d/'
+    if 'd' in percorso:
+        idx = percorso.index('d')
+        doc_id = percorso[idx + 1]
     else:
-        base_link = url_grezzo.split("?")[0].rstrip("/")
+        # Se il link è un formato alternativo, ripuliamo i parametri di query
+        doc_id = url_grezzo.split('?')[0].split('/')[-1]
+    
+    # Ricostruiamo la radice pulita dell'URL del documento
+    base_link = f"https://google.com{doc_id}"
 
-    # 1. LETTURA RIGIDA SCHEDA ALLENAMENTI (Forzata sulla prima scheda gid=0)
+    # 2. LETTURA RIGIDA SCHEDA ALLENAMENTI (Forzata sulla prima scheda gid=0)
     url_allenamenti = f"{base_link}/export?format=csv&gid=0&nocache={int(time.time())}"
     df_completo = pd.read_csv(url_allenamenti)
     df_completo.columns = df_completo.columns.str.strip()
 
     try:
         import random
-        # 2. LETTURA RIGIDA SCHEDA CREDENZIALI (Utilizziamo il motore grafico gviz per nome)
+        # 3. LETTURA RIGIDA SCHEDA CREDENZIALI (Utilizziamo il motore grafico gviz per nome)
         url_credenziali = f"{base_link}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         
         df_utenti = pd.read_csv(url_credenziali)
@@ -41,7 +50,7 @@ try:
             ))
             UTENTI_TEAM.update(utenti_letti)
         else:
-            st.sidebar.warning("⚠️ Google non ha servito la scheda 'Credenziali'. Ricontrolla il nome esatto.")
+            st.sidebar.warning("⚠️ Google Sheets non ha servito la scheda 'Credenziali'. Verranno usati i dati di backup.")
             
     except Exception as errore_lettura:
         st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
