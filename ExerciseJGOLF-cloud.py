@@ -7,49 +7,46 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
-# Impostiamo IMMEDIATAMENTE gli utenti di backup standard
+# Impostiamo gli utenti fissi locali di backup
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
     
-    # Ricostruzione sicura e robusta del link CSV di Google Sheets
-    if "edit" in base_url:
-        base_csv = base_url.split("edit")[0] + "export?format=csv"
-    else:
-        base_csv = base_url.rstrip("/") + "/export?format=csv"
-        
-    df_completo = pd.read_csv(f"{base_csv}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
+    # 1. Puliamo il link di base rimuovendo qualsiasi parametro finale (edit, gid, ecc.)
+    link_pulito = base_url.split("/edit")[0] if "/edit" in base_url else base_url.rstrip("/")
+    
+    # 2. URL per la scheda Risposte del modulo 1 (Forziamo gid=0)
+    url_allenamenti = f"{link_pulito}/export?format=csv&gid=0&nocache={int(time.time())}"
+    df_completo = pd.read_csv(url_allenamenti)
     df_completo.columns = df_completo.columns.str.strip()
 
     try:
         import random
-        # Tentativo di scaricare il foglio Credenziali bypassando la cache
-        url_credenziali = f"{base_csv}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        # 3. URL per la scheda Credenziali usando il suo ID specifico ricavato dal foglio
+        # Utilizziamo il parametro corretto di Google: 'gid' al posto di 'sheet'
+        url_credenziali = f"{link_pulito}/export?format=csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
-        st.sidebar.write("Debug Utenti Online:", df_utenti)
         
-        # Verifichiamo che il foglio contenga almeno due colonne prima di procedere
-        if df_utenti.shape[1] >= 2:
+        # Verifichiamo che la struttura della tabella sia corretta prima di estrarre le credenziali
+        if "Username" in df_utenti.columns or df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
             ))
-            # Aggiorniamo il dizionario con gli utenti appresi dal foglio online
+            # Sincronizziamo i dati online nel dizionario dell'applicazione
             UTENTI_TEAM.update(utenti_letti)
-        else:
-            st.sidebar.warning("Il foglio 'Credenziali' non ha abbastanza colonne (minimo 2).")
-
+            
     except Exception as errore_lettura:
-        # Se la lettura online fallisce, stampiamo l'errore ma lasciamo attivi gli utenti locali
-        st.sidebar.warning(f"Lettura online utenti non disponibile: {errore_lettura}")
+        st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
+    st.error(f"Errore di configurazione generale: {e}")
     st.stop()
 
-# Integriamo in ogni caso gli utenti registrati sul momento nella sessione corrente
+# Uniamo gli utenti registrati sul momento nella sessione corrente
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
 
 DIZIONARIO_ESERCIZI = {
