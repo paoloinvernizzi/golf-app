@@ -106,7 +106,7 @@ with st.sidebar:
                     except:
                         st.error("Errore di comunicazione durante la registrazione.")
     else:
-        st.success(f"🌐 Utente: {st.session_state.username.upper()}")
+        st.success(f"🌐 Utente: {st.session_state.username.lower()}")
         if st.button("🚪 Esci", use_container_width=True):
             st.session_state.autenticato, st.session_state.username = False, ""
             st.rerun()
