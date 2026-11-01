@@ -12,7 +12,7 @@ try:
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
     elif "edit#" in base_url:
-        csv_url = base_url.split("edit#")[0] + "export?format=csv"
+        csv_url = base_url.split("edit#") + "export?format=csv"
     else:
         csv_url = base_url + "/export?format=csv"
         
@@ -39,6 +39,12 @@ DIZIONARIO_ESERCIZI = {
 if 'autenticato' not in st.session_state: st.session_state.autenticato = False
 if 'username' not in st.session_state: st.session_state.username = ""
 if 'fase_selezionata' not in st.session_state: st.session_state.fase_selezionata = "⚡ Pre Gara"
+if 'esercizio_selezionato' not in st.session_state: st.session_state.esercizio_selezionato = ""
+
+# Aggiornamento automatico dell'esercizio di default quando cambia la fase
+lista_esercizi_correnti = DIZIONARIO_ESERCIZI[st.session_state.fase_selezionata]
+if st.session_state.esercizio_selezionato not in lista_esercizi_correnti:
+    st.session_state.esercizio_selezionato = lista_esercizi_correnti[0]
 
 # ==========================================
 # 2. SIDEBAR DI LOG-IN
@@ -65,8 +71,8 @@ if not st.session_state.autenticato:
     st.info("Accedi con il tuo account in sidebar per visualizzare ed inserire i tuoi dati.")
 else:
     is_coach = (st.session_state.username == "coach")
-    col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns[1])
-    col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns[2])
+    col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns)
+    col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns)
     col_diff = 'Difficoltà' if 'Difficoltà' in df_completo.columns else ('difficolta' if 'difficolta' in df_completo.columns else df_completo.columns[-1])
 
     if is_coach:
@@ -83,41 +89,56 @@ else:
     with tab_inserimento:
         if is_coach: st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'.")
         else:
-            st.markdown("### 🎯 Seleziona la tua sessione")
+            # Sotto-pannello 1: Selezione Macrofase (Pre, Post, Casa)
+            st.markdown("### 🎯 1. Seleziona la tua sessione")
             c1, c2, c3 = st.columns(3)
-            
             with c1:
-                st.markdown('<div style="background-color: #e8f4f8; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>⚡</h2><b>PRE GARA</b></div>', unsafe_allow_html=True)
-                if st.button("Pre Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): 
+                st.markdown('<div style="background-color: #e8f4f8; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 5px;"><h3>⚡</h3><b>PRE GARA</b></div>', unsafe_allow_html=True)
+                if st.button("Attiva Pre Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): 
                     st.session_state.fase_selezionata = "⚡ Pre Gara"; st.rerun()
-            
             with c2:
-                st.markdown('<div style="background-color: #e8f8f0; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>🧘</h2><b>POST GARA</b></div>', unsafe_allow_html=True)
-                if st.button("Post Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): 
+                st.markdown('<div style="background-color: #e8f8f0; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 5px;"><h2>🧘</h2><b>POST GARA</b></div>', unsafe_allow_html=True)
+                if st.button("Attiva Post Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): 
                     st.session_state.fase_selezionata = "🧘 Post Gara"; st.rerun()
-            
             with c3:
-                st.markdown('<div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>🏠</h2><b>A CASA</b></div>', unsafe_allow_html=True)
-                if st.button("Casa", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): 
+                st.markdown('<div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 5px;"><h2>🏠</h2><b>A CASA</b></div>', unsafe_allow_html=True)
+                if st.button("Attiva Casa", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): 
                     st.session_state.fase_selezionata = "🏠 Allenamento a Casa"; st.rerun()
 
             st.write("---")
-            st.markdown(f"#### 📋 Esercizio per: **{st.session_state.fase_selezionata}**")
-            es_scelto = st.selectbox("Seleziona esercizio:", DIZIONARIO_ESERCIZI[st.session_state.fase_selezionata])
             
+            # Sotto-pannello 2: Griglia Esercizi Cliccabili (Sostituisce la vecchia tendina)
+            st.markdown(f"### 🏌️‍♂️ 2. Seleziona l'esercizio svolto per **{st.session_state.fase_selezionata}**")
+            
+            # Generiamo una griglia a 2 colonne di pulsanti per gli esercizi per una perfetta visibilità mobile
+            col_es1, col_es2 = st.columns(2)
+            for i, es in enumerate(lista_esercizi_correnti):
+                # Scegliamo quale colonna usare per alternare i pulsanti
+                target_col = col_es1 if i % 2 == 0 else col_es2
+                with target_col:
+                    is_selezionato = (st.session_state.esercizio_selezionato == es)
+                    # Se il pulsante è selezionato, assume il colore di attivazione (primary)
+                    if st.button(es, use_container_width=True, type="primary" if is_selezionato else "secondary", key=f"btn_es_{i}"):
+                        st.session_state.esercizio_selezionato = es
+                        st.rerun()
+            
+            st.write("---")
+            
+            # Sotto-pannello 3: Configurazione Parametri della sessione
+            st.markdown(f"### 📋 3. Parametri per: *{st.session_state.esercizio_selezionato}*")
             cp1, cp2 = st.columns(2)
             with cp1:
-                serie = st.number_input("🔢 Serie:", min_value=1, value=3)
-                ripetizioni = st.number_input("🔄 Ripetizioni / Sec:", min_value=1, value=10)
-                carico = st.number_input("⚖️ Carico (Kg):", min_value=0.0, value=0.0, step=0.5)
+                serie = st.number_input("🔢 Serie eseguite:", min_value=1, value=3)
+                ripetizioni = st.number_input("🔄 Ripetizioni / Secondi di tenuta:", min_value=1, value=10)
+                carico = st.number_input("⚖️ Sovraccarico usato (Kg):", min_value=0.0, value=0.0, step=0.5)
             with cp2:
-                difficolta = st.slider("⭐ Fatica Percepita (RPE 1-5):", min_value=1, max_value=5, value=3)
-                impressioni = st.text_area("💭 Note e sensazioni:")
+                difficolta = st.slider("⭐ Fatica Percepita (Scala RPE 1-5):", min_value=1, max_value=5, value=3)
+                impressioni = st.text_area("💭 Note, fastidi o sensazioni personali:")
 
             if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
                 try:
                     url_script = st.secrets["connections"]["gsheets"]["script_url"]
-                    payload = {"utente": st.session_state.username, "fase": st.session_state.fase_selezionata, "categoria": "Sessione Diretta", "esercizio": es_scelto, "serie": int(serie), "ripetizioni": int(ripetizioni), "peso": float(carico), "difficolta": int(difficolta), "note": impressioni}
+                    payload = {"utente": st.session_state.username, "fase": st.session_state.fase_selezionata, "categoria": "Sessione Diretta", "esercizio": st.session_state.esercizio_selezionato, "serie": int(serie), "ripetizioni": int(ripetizioni), "peso": float(carico), "difficolta": int(difficolta), "note": impressioni}
                     res = requests.post(url_script, data=json.dumps(payload), headers={"Content-Type": "text/plain"}, allow_redirects=True)
                     if res.status_code == 200: st.success("💪 Ottimo lavoro! Sessione salvata nel Cloud.")
                     else: st.error(f"Errore di rete. Codice: {res.status_code}")
@@ -135,5 +156,5 @@ else:
             if col_diff in df_visibile.columns:
                 df_visibile[col_diff] = pd.to_numeric(df_visibile[col_diff], errors='coerce')
                 k2.metric("Media Fatica Percepita", f"{df_visibile[col_diff].mean():.1f} / 5 ⭐")
-            st.write("---")
-            st.dataframe(df_visibile, use_container_width=True)
+                st.write("---")
+                st.dataframe(df_visibile, use_container_width=True)
