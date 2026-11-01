@@ -13,8 +13,7 @@ UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 try:
     url_grezzo = st.secrets["connections"]["gsheets"]["url"]
     
-    # PULIZIA TOTALE: Isoliamo esclusivamente l'ID del documento (stringa tra /d/ e /edit)
-    # Questo elimina alla radice qualsiasi vecchio gid o parametro ereditato dai Secrets
+    # PULIZIA URL SICURA: Estraiamo l'ID unico del foglio senza rompere l'indirizzo
     if "/d/" in url_grezzo:
         doc_id = url_grezzo.split("/d/")[1].split("/")[0]
         base_link = f"https://google.com{doc_id}"
@@ -28,13 +27,13 @@ try:
 
     try:
         import random
-        # 2. LETTURA RIGIDA SCHEDA CREDENZIALI (Usiamo l'endpoint gviz sul link pulito)
+        # 2. LETTURA RIGIDA SCHEDA CREDENZIALI (Utilizziamo il motore grafico gviz per nome)
         url_credenziali = f"{base_link}/gviz/tq?tqx=out:csv&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}"
         
         df_utenti = pd.read_csv(url_credenziali)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Verifichiamo che la tabella scaricata sia effettivamente quella delle credenziali
+        # Verifichiamo che la tabella scaricata non contenga i dati della scheda sbagliata
         if df_utenti.shape[1] >= 2 and "Fase" not in df_utenti.columns and "Timestamp" not in df_utenti.columns:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
@@ -42,13 +41,13 @@ try:
             ))
             UTENTI_TEAM.update(utenti_letti)
         else:
-            st.sidebar.warning("⚠️ La scheda 'Credenziali' non è stata letta correttamente. Controlla il nome sul foglio.")
+            st.sidebar.warning("⚠️ Google non ha servito la scheda 'Credenziali'. Ricontrolla il nome esatto.")
             
     except Exception as errore_lettura:
         st.sidebar.warning(f"Sincronizzazione online credenziali non attiva: {errore_lettura}")
 
 except Exception as e:
-    st.error(f"Errore di configurazione generale: {e}")
+    st.error(f"Errore di configurazione generale (Verifica il link nei Secrets): {e}")
     st.stop()
 
 # Uniamo gli utenti registrati sul momento nella sessione corrente
