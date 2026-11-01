@@ -7,34 +7,33 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 if 'nuovo_utente_locale' not in st.session_state:
     st.session_state.nuovo_utente_locale = {}
 
-# Utenti fissi di emergenza
+# Utenti fissi di emergenza locali
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
-    # 1. LEGGE IL FILE DEGLI ALLENAMENTI
+    # 1. LETTURA PULITA FILE 1 (ALLENAMENTI)
     url_all_grezzo = st.secrets["connections"]["gsheets"]["url"]
-    if "/edit" in url_all_grezzo:
-        csv_url_all = url_all_grezzo.split("/edit")[0] + "/export?format=csv&gid=0"
-    else:
-        csv_url_all = url_all_grezzo.rstrip("/") + "/export?format=csv&gid=0"
-        
-    df_completo = pd.read_csv(f"{csv_url_all}&nocache={int(time.time())}")
+    # Estraiamo solo la radice del link prima di /edit per azzerare ogni vecchio parametro gid errato
+    base_link_all = url_all_grezzo.split("/edit") if "/edit" in url_all_grezzo else url_all_grezzo.split("?")[0].rstrip("/")
+    
+    # Scarichiamo la prima scheda rimasta (che ora contiene solo gli allenamenti)
+    csv_url_all = f"{base_link_all}/export?format=csv&nocache={int(time.time())}"
+    df_completo = pd.read_csv(csv_url_all)
     df_completo.columns = df_completo.columns.str.strip()
 
-    # 2. LEGGE IL NUOVO FILE DELLE PASSWORD (CREDENZIALI)
+    # 2. LETTURA PULITA FILE 2 (CREDENZIALI)
     try:
         import random
         url_cred_grezzo = st.secrets["connections"]["gsheets"]["url_credenziali"]
-        if "/edit" in url_cred_grezzo:
-            csv_url_cred = url_cred_grezzo.split("/edit")[0] + "/export?format=csv&gid=0"
-        else:
-            csv_url_cred = url_cred_grezzo.rstrip("/") + "/export?format=csv&gid=0"
-            
-        df_utenti = pd.read_csv(f"{csv_url_cred}&nocache={int(time.time())}&r={random.randint(1,9999)}")
+        base_link_cred = url_cred_grezzo.split("/edit") if "/edit" in url_cred_grezzo else url_cred_grezzo.split("?")[0].rstrip("/")
+        
+        # Scarichiamo la prima scheda del secondo file (le password)
+        csv_url_cred = f"{base_link_cred}/export?format=csv&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        df_utenti = pd.read_csv(csv_url_cred)
         df_utenti.columns = df_utenti.columns.str.strip()
         
-        # Prende la colonna A (utenti) e la colonna B (password) dal nuovo foglio
-        if df_utenti.shape[1] >= 2:
+        # Sincronizziamo username (Colonna A) e password (Colonna B)
+        if df_utenti.shape >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
