@@ -96,7 +96,7 @@ try:
     if "edit?usp=sharing" in base_url:
         csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
     elif "edit#" in base_url:
-        csv_url = base_url.split("edit#") + "export?format=csv"
+        csv_url = base_url.split("edit#")[0] + "export?format=csv"
     else:
         csv_url = base_url + "/export?format=csv"
         
@@ -106,8 +106,7 @@ try:
     # Pulizia spazi nei nomi delle colonne
     df_completo.columns = df_completo.columns.str.strip()
     
-    # ASSOCIAZIONE POSIZIONALE DI SICUREZZA
-    # Se i nomi cambiano, forziamo le colonne in base al loro ordine fisico nel foglio Excel
+    # ASSOCIAZIONE POSIZIONALE DI SICUREZZA (Risolto errore di indice)
     if len(df_completo.columns) >= 5:
         df_completo = df_completo.rename(columns={
             df_completo.columns[1]: 'Utente',
@@ -115,7 +114,7 @@ try:
             df_completo.columns[4]: 'Esercizio'
         })
     
-    # Controllo per la colonna difficoltà
+    # Controllo adattivo per la colonna difficoltà
     for col in df_completo.columns:
         if col.lower() in ['difficoltà', 'difficolta', 'difficoltà']:
             df_completo = df_completo.rename(columns={col: 'Difficoltà'})
@@ -206,7 +205,7 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    # Applicazione del filtro anti-errore
+    # Sistema di filtraggio profondo anti-spazi vuoti
     if 'Utente' in df_completo.columns:
         df_completo['Utente_Lower'] = df_completo['Utente'].astype(str).str.strip().str.lower()
         if is_coach:
