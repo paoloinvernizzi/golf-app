@@ -7,6 +7,21 @@ import time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
+# ==========================================
+# FUNZIONE ESTERNA DI INVIO (EVITA ERRORI DI INDENTAZIONE)
+# ==========================================
+def invia_dati_cloud(url, dati):
+    try:
+        inviato = requests.post(
+            url, 
+            data=json.dumps(dati), 
+            headers={"Content-Type": "text/plain"},
+            allow_redirects=True
+        )
+        return inviato.status_code
+    except:
+        return 500
+
 # 1. LETTURA DATI (ANTI-CACHE LIVE)
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
@@ -120,13 +135,11 @@ else:
     # --- TAB INSERIMENTO DATI (INTERFACCIA NATIVA MOBILE) ---
     with tab_inserimento:
         if is_coach:
-            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. For registrare esercizi effettua l'accesso come atleta.")
+            st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare esercizi effettua l'accesso come atleta.")
         else:
             st.markdown("### 🎯 Seleziona la tua sessione")
             
-            # Griglia a 3 colonne nativa con immagini e pulsanti
             card1, card2, card3 = st.columns(3)
-            
             with card1:
                 st.image("https://unsplash.com", caption="Mobilità e attivazione pre-round", use_container_width=True)
                 if st.button("⚡ PRE GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"):
@@ -148,7 +161,6 @@ else:
             st.write("---")
             st.markdown(f"#### 📋 Configura esercizio per: **{st.session_state.fase_selezionata}**")
             
-            # Appare solo l'esercizio filtrato in base al blocco cliccato sopra
             esercizio_scelto = st.selectbox("Seleziona l'esercizio svolto:", DIZIONARIO_ESERCIZI[st.session_state.fase_selezionata])
             
             col_parametri1, col_parametri2 = st.columns(2)
@@ -167,30 +179,27 @@ else:
                 impressioni = st.text_area("💭 Note, dolori o sensazioni della sessione:")
 
             if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
-                try:
-                    SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
-                    if not SCRIPT_URL:
-                        st.error("URL dello Script non configurato nei Secrets.")
+                SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
+                if not SCRIPT_URL:
+                    st.error("URL dello Script non configurato nei Secrets.")
+                else:
+                    payload = {
+                        "utente": st.session_state.username,
+                        "fase": st.session_state.fase_selezionata,
+                        "categoria": "Sessione Diretta",
+                        "esercizio": esercizio_scelto,
+                        "serie": int(serie),
+                        "ripetizioni": int(ripetizioni),
+                        "peso": float(carico),
+                        "difficolta": int(difficolta),
+                        "note": impressioni
+                    }
+                    
+                    status = invia_dati_cloud(SCRIPT_URL, payload)
+                    if status == 200:
+                        st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
                     else:
-                        payload = {
-                            "utente": st.session_state.username,
-                            "fase": st.session_state.fase_selezionata,
-                            "categoria": "Sessione Diretta",
-                            "esercizio": esercizio_scelto,
-                            "serie": int(serie),
-                            "ripetizioni": int(ripetizioni),
-                            "peso": float(carico),
-                            "difficolta": int(difficolta),
-                            "note": impressioni
-                        }
-                        inviato = requests.post(
-                            SCRIPT_URL, 
-                            data=json.dumps(payload), 
-                            headers={"Content-Type": "text/plain"},
-                            allow_redirects=True
-                        )
-                        if inviato.status_code == 200:
-                            st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
-                        else:
-                            st.error(f"Errore di rete. Status code: {inviato.status_code}")
-                except Exception as err:
+                        st.error(f"Errore di sincronizzazione. Controlla la connessione o Apps Script. Codice: {status}")
+
+    # --- TAB DASHBOARD & MONITORAGGIO ---
+    with tab_dashboard:
