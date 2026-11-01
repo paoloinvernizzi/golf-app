@@ -9,11 +9,19 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 # ==========================================
 try:
     base_url = st.secrets["connections"]["gsheets"]["url"]
-    csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in base_url else (base_url.split("edit#")[0] + "export?format=csv" if "edit#" in base_url else base_url + "/export?format=csv")
-    df_completo = pd.read_csv(f"{csv_url}&nocache={int(time.time())}")
+    if "edit?usp=sharing" in base_url:
+        csv_url = base_url.replace("edit?usp=sharing", "export?format=csv")
+    elif "edit#" in base_url:
+        csv_url = base_url.split("edit#")[0] + "export?format=csv"
+    else:
+        csv_url = base_url + "/export?format=csv"
+        
+    live_csv_url = f"{csv_url}&nocache={int(time.time())}"
+    df_completo = pd.read_csv(live_csv_url)
     df_completo.columns = df_completo.columns.str.strip()
 except Exception as e:
-    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets."); st.stop()
+    st.error("Configura correttamente il link del tuo Google Sheet nei Secrets.")
+    st.stop()
 
 UTENTI_TEAM = {
     "coach": hashlib.sha256("coachmaster".encode()).hexdigest(),
@@ -50,7 +58,7 @@ with st.sidebar:
             st.session_state.autenticato, st.session_state.username = False, ""; st.rerun()
 
 # ==========================================
-# 3. INTERFACCIA PRINCIPALE
+# 3. INTERFACCIA PRINCIPALE AD APP NATIVA
 # ==========================================
 if not st.session_state.autenticato:
     st.title("⛳ Golf Performance Hub")
@@ -78,14 +86,14 @@ else:
             st.markdown("### 🎯 Seleziona la tua sessione")
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.image("https://unsplash.com", use_container_width=True)
-                if st.button("⚡ PRE GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): st.session_state.fase_selezionata = "⚡ Pre Gara"; st.rerun()
+                st.info("### ⚡\n**PRE GARA**")
+                if st.button("Seleziona Pre Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): st.session_state.fase_selezionata = "⚡ Pre Gara"; st.rerun()
             with c2:
-                st.image("https://unsplash.com", use_container_width=True)
-                if st.button("🧘 POST GARA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): st.session_state.fase_selezionata = "🧘 Post Gara"; st.rerun()
+                st.success("### 🧘\n**POST GARA**")
+                if st.button("Seleziona Post Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): st.session_state.fase_selezionata = "🧘 Post Gara"; st.rerun()
             with c3:
-                st.image("https://unsplash.com", use_container_width=True)
-                if st.button("🏠 ALLENAMENTO CASA", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): st.session_state.fase_selezionata = "🏠 Allenamento a Casa"; st.rerun()
+                st.help("### 🏠\n**A CASA**")
+                if st.button("Seleziona Casa", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): st.session_state.fase_selezionata = "🏠 Allenamento a Casa"; st.rerun()
 
             st.write("---")
             st.markdown(f"#### 📋 Esercizio per: **{st.session_state.fase_selezionata}**")
