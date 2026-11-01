@@ -7,35 +7,74 @@ import time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
-# Inizializziamo una lista per raccogliere i messaggi di log da mostrare all'utente
+# Inizializzazione della lista dei log
 if "log_messaggi" not in st.session_state:
     st.session_state.log_messaggi = []
 
 def aggiungi_log(testo):
-    """Aggiunge un messaggio di log con timestamp interno"""
     orario = time.strftime("%H:%M:%S")
     st.session_state.log_messaggi.append(f"[{orario}] {testo}")
 
-# Puliamo i log vecchi ad ogni avvio della pagina per non intasare la memoria
 st.session_state.log_messaggi = []
 aggiungi_log("⚙️ Avvio applicazione Golf Performance Cloud...")
+
+# ==========================================
+# DATABASE ESERCIZI (STRUTTURATO E PROTETTO)
+# ==========================================
+DIZIONARIO_ESERCIZI = {
+    "⚡ Pre Gara": [
+        "🦒 Mobilità collo (Flessione/estensione, Rotazione dx/sx)",
+        "🏋️‍♂️ Mobilità spalle con ferro (Sollevare e portare dietro)",
+        "🔄 Mobilità dorso (Flessione ginocchia, braccia incrociate)",
+        "🏌️‍♂️ Mobilità dorso (Ferro dietro le spalle, rotazione busto)",
+        "🎯 Mobilità bacino (Spostamenti laterali, circonduzioni)",
+        "🦶 Mobilità piedi/caviglie (Cedimento alternato)",
+        "🎗️ Swing con elastico (Solo back - solo finish - completo)",
+        "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti simmetrici", 
+        "🦿 Core: Ponti monolaterali", "⏱️ Core: Plank statico (30-60\")", 
+        "🧱 Core: Plank laterale (30-60\")", "🦸‍♂️ Core: Superman", "🏃‍♂️ Core: Mountain climbers"
+    ],
+    "🧘 Post Gara": [
+        "🤚 Stretching M. Estensori Mano (Allungamento dita)",
+        "💪 Stretching Avambraccio e Polso (Estensione braccio)",
+        "🚪 Stretching Pettorale Monolaterale (Appoggio spalliera)",
+        "📐 Stretching M. Dorsale Monolaterale",
+        "🏹 Stretching Tricipite Brachiale",
+        "🛌 Stretching Piriforme da supino",
+        "↔️ Stiramento simmetrico colonna da supino",
+        "🐈 Quadrupedia Gobba/Inarcamento Rachide",
+        "🧘 Stiramento colonna da seduto sui talloni",
+        "⚔️ Stretching Psoas da posizione cavalier servente",
+        "🧍 Stretching Tensore Fascia Lata",
+        "🪑 Stretching M. Ischio Crurale da seduto"
+    ],
+    "🏠 Allenamento a Casa": [
+        "🏋️‍♂️ Squat con bilanciere o pesi",
+        "🔄 Circuito Addome (Crunch+Ponte+Russian Twist+Plank)",
+        "🛡️ Affondo anteriore + Rotazione busto con peso",
+        "👐 Alzate laterali e frontali monolaterali",
+        "🪜 Affondi bulgari con pesi o a corpo libero",
+        "🏌️‍♂️ Swing a corpo libero con peso (3 phases)",
+        "🏆 Circuito Core Completo (Esercizi da 1 a 8)"
+    ]
+}
 
 # ==========================================
 # FUNZIONI DI SUPPORTO
 # ==========================================
 def invia_dati_cloud(url, dati):
     try:
-        aggiungi_log(f"🚀 Tentativo di invio dati a Apps Script...")
+        aggiungi_log("🚀 Tentativo di invio dati a Apps Script...")
         inviato = requests.post(
             url, 
             data=json.dumps(dati), 
             headers={"Content-Type": "text/plain"},
             allow_redirects=True
         )
-        aggiungi_log(f"📥 Risposta Apps Script ricevuta con codice di stato: {inviato.status_code}")
+        aggiungi_log(f"📥 Risposta Apps Script: {inviato.status_code}")
         return inviato.status_code
     except Exception as e:
-        aggiungi_log(f"❌ Errore critico durante l'invio via richieste POST: {str(e)}")
+        aggiungi_log(f"❌ Errore durante l'invio: {str(e)}")
         return 500
 
 def ricava_csv_url():
@@ -43,9 +82,7 @@ def ricava_csv_url():
         if "connections" in st.secrets and "gsheets" in st.secrets["connections"] and "url" in st.secrets["connections"]["gsheets"]:
             base_url = st.secrets["connections"]["gsheets"]["url"]
             if not base_url:
-                aggiungi_log("⚠️ L'URL nei Secrets di gsheets è presente ma vuoto.")
                 return None
-            aggiungi_log("🔗 URL grezzo recuperato con successo dai Secrets.")
             if "edit?usp=sharing" in base_url:
                 return base_url.replace("edit?usp=sharing", "export?format=csv")
             elif "edit#" in base_url:
@@ -55,7 +92,7 @@ def ricava_csv_url():
             else:
                 return base_url.rstrip("/") + "/export?format=csv"
     except Exception as e:
-        aggiungi_log(f"❌ Errore nell'elaborazione della stringa dei Secrets URL: {str(e)}")
+        aggiungi_log(f"❌ Errore link secret: {str(e)}")
     return None
 
 def mostra_form_inserimento(esercizi_dict):
@@ -105,7 +142,6 @@ def mostra_form_inserimento(esercizi_dict):
             SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
             if not SCRIPT_URL:
                 st.error("URL dello Script non configurato nei Secrets.")
-                aggiungi_log("❌ Invio annullato: script_url mancante nei secrets.")
             else:
                 payload = {
                     "utente": st.session_state.username.strip().lower(),
@@ -121,15 +157,14 @@ def mostra_form_inserimento(esercizi_dict):
                 
                 status = invia_dati_cloud(SCRIPT_URL, payload)
                 if status == 200:
-                    st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Premi su 'Vedi Progressi' per controllare lo storico.")
+                    st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Controlla lo storico in dashboard.")
                 else:
                     st.error(f"Errore di sincronizzazione. Codice: {status}")
         except Exception as e:
             st.error(f"Errore durante l'invio: {e}")
-            aggiungi_log(f"❌ Eccezione nel blocco del pulsante di invio: {str(e)}")
 
 # ==========================================
-# 1. CARICAMENTO DATI DA CLOUD (BLINDATO CON LOG)
+# 1. CARICAMENTO DATI DA CLOUD (CON LOG)
 # ==========================================
 df_completo = pd.DataFrame()
 colonne_rilevate = []
@@ -138,15 +173,14 @@ link_csv = ricava_csv_url()
 if link_csv:
     try:
         live_csv_url = f"{link_csv}&nocache={int(time.time())}"
-        aggiungi_log(f"📥 Tentativo di lettura file CSV da Google Drive: {live_csv_url[:50]}...")
+        aggiungi_log("📥 Lettura file CSV da Google Sheet...")
         df_grezzo = pd.read_csv(live_csv_url)
         
         if not df_grezzo.empty:
             df_grezzo.columns = df_grezzo.columns.str.strip()
             colonne_rilevate = list(df_grezzo.columns)
-            aggiungi_log(f"📊 Download riuscito! Trovate {len(df_grezzo)} righe totali e {len(colonne_rilevate)} colonne.")
+            aggiungi_log(f"📊 Scaricate {len(df_grezzo)} righe e {len(colonne_rilevate)} colonne.")
             
-            # Mappatura posizionale sicura
             mappa = {}
             if len(df_grezzo.columns) >= 2: mappa[df_grezzo.columns[1]] = 'Utente'
             if len(df_grezzo.columns) >= 3: mappa[df_grezzo.columns[2]] = 'Fase'
@@ -157,16 +191,15 @@ if link_csv:
                     mappa[c] = 'Difficoltà'
             
             df_completo = df_grezzo.rename(columns=mappa)
-            aggiungi_log("🔄 Rinominazione delle colonne per posizione fisica completata.")
+            aggiungi_log("🔄 Colonne mappate correttamente per posizione fisica.")
         else:
-            aggiungi_log("⚠️ Attenzione: Il file CSV scaricato dal foglio risulta totalmente vuoto (0 righe).")
+            aggiungi_log("⚠️ Il file CSV scaricato risulta vuoto.")
     except Exception as err:
-        aggiungi_log(f"❌ Errore durante il pd.read_csv o la mappatura: {str(err)}")
+        aggiungi_log(f"❌ Errore pd.read_csv: {str(err)}")
 else:
-    aggiungi_log("❌ Impossibile tentare la lettura: link_csv non è stato generato.")
+    aggiungi_log("❌ Link CSV non disponibile.")
 
 if df_completo.empty:
-    aggiungi_log("🛡️ Generazione di un dataframe vuoto di salvataggio per prevenire crash dell'interfaccia.")
     df_completo = pd.DataFrame(columns=['Timestamp', 'Utente', 'Fase', 'Esercizio', 'Difficoltà'])
 
 # ==========================================
@@ -179,25 +212,7 @@ UTENTI_TEAM = {
     "atleta3": hashlib.sha256("golf2026".encode()).hexdigest()
 }
 
-DIZIONARIO_ESERCIZI = {
-    "⚡ Pre Gara": [
-        "🦒 Mobilità collo (Flessione/estensione, Rotazione dx/sx)",
-        "🏋️‍♂️ Mobilità spalle con ferro (Sollevare e portare dietro)",
-        "🔄 Mobilità dorso (Flessione ginocchia, braccia incrociate)",
-        "🏌️‍♂️ Mobilità dorso (Ferro dietro le spalle, rotazione busto)",
-        "🎯 Mobilità bacino (Spostamenti laterali, circonduzioni)",
-        "🦶 Mobilità piedi/caviglie (Cedimento alternato)",
-        "🎗️ Swing con elastico (Solo back - solo finish - completo)",
-        "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti simmetrici", 
-        "🦿 Core: Ponti monolaterali", "⏱️ Core: Plank statico (30-60\")", 
-        "🧱 Core: Plank laterale (30-60\")", "🦸‍♂️ Core: Superman", "🏃‍♂️ Core: Mountain climbers"
-    ],
-    "🧘 Post Gara": [
-        "🤚 Stretching M. Estensori Mano (Allungamento dita)",
-        "💪 Stretching Avambraccio e Polso (Estensione braccio)",
-        "🚪 Stretching Pettorale Monolaterale (Appoggio spalliera)",
-        "📐 Stretching M. Dorsale Monolaterale",
-        "🏹 Stretching Tricipite Brachiale",
-        "🛌 Stretching Piriforme da supino",
-        "↔️ Stiramento simmetrico colonna da supino",
-        "🐈 Quadrupedia Gobba/Inarcamento Rachide",
+if 'autenticato' not in st.session_state:
+    st.session_state.autenticato = False
+if 'username' not in st.session_state:
+    st.session_state.username = ""
