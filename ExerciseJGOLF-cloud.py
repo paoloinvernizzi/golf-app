@@ -7,28 +7,45 @@ import time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
+# Inizializziamo una lista per raccogliere i messaggi di log da mostrare all'utente
+if "log_messaggi" not in st.session_state:
+    st.session_state.log_messaggi = []
+
+def aggiungi_log(testo):
+    """Aggiunge un messaggio di log con timestamp interno"""
+    orario = time.strftime("%H:%M:%S")
+    st.session_state.log_messaggi.append(f"[{orario}] {testo}")
+
+# Puliamo i log vecchi ad ogni avvio della pagina per non intasare la memoria
+st.session_state.log_messaggi = []
+aggiungi_log("⚙️ Avvio applicazione Golf Performance Cloud...")
+
 # ==========================================
-# FUNZIONI DI SUPPORTO (ISOLATE E COPERTE DA TRY/EXCEPT)
+# FUNZIONI DI SUPPORTO
 # ==========================================
 def invia_dati_cloud(url, dati):
     try:
+        aggiungi_log(f"🚀 Tentativo di invio dati a Apps Script...")
         inviato = requests.post(
             url, 
             data=json.dumps(dati), 
             headers={"Content-Type": "text/plain"},
             allow_redirects=True
         )
+        aggiungi_log(f"📥 Risposta Apps Script ricevuta con codice di stato: {inviato.status_code}")
         return inviato.status_code
-    except:
+    except Exception as e:
+        aggiungi_log(f"❌ Errore critico durante l'invio via richieste POST: {str(e)}")
         return 500
 
 def ricava_csv_url():
-    """Genera l'URL di download CSV in modo sicuro senza rischiare crash di stringa"""
     try:
         if "connections" in st.secrets and "gsheets" in st.secrets["connections"] and "url" in st.secrets["connections"]["gsheets"]:
             base_url = st.secrets["connections"]["gsheets"]["url"]
             if not base_url:
+                aggiungi_log("⚠️ L'URL nei Secrets di gsheets è presente ma vuoto.")
                 return None
+            aggiungi_log("🔗 URL grezzo recuperato con successo dai Secrets.")
             if "edit?usp=sharing" in base_url:
                 return base_url.replace("edit?usp=sharing", "export?format=csv")
             elif "edit#" in base_url:
@@ -37,8 +54,8 @@ def ricava_csv_url():
                 return base_url
             else:
                 return base_url.rstrip("/") + "/export?format=csv"
-    except:
-        pass
+    except Exception as e:
+        aggiungi_log(f"❌ Errore nell'elaborazione della stringa dei Secrets URL: {str(e)}")
     return None
 
 def mostra_form_inserimento(esercizi_dict):
@@ -88,6 +105,7 @@ def mostra_form_inserimento(esercizi_dict):
             SCRIPT_URL = st.secrets["connections"]["gsheets"].get("script_url", "")
             if not SCRIPT_URL:
                 st.error("URL dello Script non configurato nei Secrets.")
+                aggiungi_log("❌ Invio annullato: script_url mancante nei secrets.")
             else:
                 payload = {
                     "utente": st.session_state.username.strip().lower(),
@@ -108,9 +126,10 @@ def mostra_form_inserimento(esercizi_dict):
                     st.error(f"Errore di sincronizzazione. Codice: {status}")
         except Exception as e:
             st.error(f"Errore durante l'invio: {e}")
+            aggiungi_log(f"❌ Eccezione nel blocco del pulsante di invio: {str(e)}")
 
 # ==========================================
-# 1. CARICAMENTO DATI DA CLOUD (BLINDATO)
+# 1. CARICAMENTO DATI DA CLOUD (BLINDATO CON LOG)
 # ==========================================
 df_completo = pd.DataFrame()
 colonne_rilevate = []
@@ -119,10 +138,13 @@ link_csv = ricava_csv_url()
 if link_csv:
     try:
         live_csv_url = f"{link_csv}&nocache={int(time.time())}"
+        aggiungi_log(f"📥 Tentativo di lettura file CSV da Google Drive: {live_csv_url[:50]}...")
         df_grezzo = pd.read_csv(live_csv_url)
+        
         if not df_grezzo.empty:
             df_grezzo.columns = df_grezzo.columns.str.strip()
             colonne_rilevate = list(df_grezzo.columns)
+            aggiungi_log(f"📊 Download riuscito! Trovate {len(df_grezzo)} righe totali e {len(colonne_rilevate)} colonne.")
             
             # Mappatura posizionale sicura
             mappa = {}
@@ -135,8 +157,17 @@ if link_csv:
                     mappa[c] = 'Difficoltà'
             
             df_completo = df_grezzo.rename(columns=mappa)
-    except:
-        pass
+            aggiungi_log("🔄 Rinominazione delle colonne per posizione fisica completata.")
+        else:
+            aggiungi_log("⚠️ Attenzione: Il file CSV scaricato dal foglio risulta totalmente vuoto (0 righe).")
+    except Exception as err:
+        aggiungi_log(f"❌ Errore durante il pd.read_csv o la mappatura: {str(err)}")
+else:
+    aggiungi_log("❌ Impossibile tentare la lettura: link_csv non è stato generato.")
+
+if df_completo.empty:
+    aggiungi_log("🛡️ Generazione di un dataframe vuoto di salvataggio per prevenire crash dell'interfaccia.")
+    df_completo = pd.DataFrame(columns=['Timestamp', 'Utente', 'Fase', 'Esercizio', 'Difficoltà'])
 
 # ==========================================
 # 2. SISTEMA DI CONFIGURAZIONE TEAM
@@ -170,49 +201,3 @@ DIZIONARIO_ESERCIZI = {
         "🛌 Stretching Piriforme da supino",
         "↔️ Stiramento simmetrico colonna da supino",
         "🐈 Quadrupedia Gobba/Inarcamento Rachide",
-        "🧘 Stiramento colonna da seduto sui talloni",
-        "⚔️ Stretching Psoas da posizione cavalier servente",
-        "🧍 Stretching Tensore Fascia Lata",
-        "🪑 Stretching M. Ischio Crurale da seduto"
-    ],
-    "🏠 Allenamento a Casa": [
-        "🏋️‍♂️ Squat con bilanciere o pesi",
-        "🔄 Circuito Addome (Crunch+Ponte+Russian Twist+Plank)",
-        "🛡️ Affondo anteriore + Rotazione busto con peso",
-        "👐 Alzate laterali e frontali monolaterali",
-        "🪜 Affondi bulgari con pesi o a corpo libero",
-        "🏌️‍♂️ Swing a corpo libero con peso (3 phases)",
-        "🏆 Circuito Core Completo (Esercizi da 1 a 8)"
-    ]
-}
-
-if 'autenticato' not in st.session_state:
-    st.session_state.autenticato = False
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-if 'fase_selezionata' not in st.session_state:
-    st.session_state.fase_selezionata = "⚡ Pre Gara"
-
-# ==========================================
-# 3. INTERFACCIA UTENTE (SIDEBAR & SCHERMATA LOGIN)
-# ==========================================
-with st.sidebar:
-    st.header("🔐 Accesso Team")
-    if not st.session_state.autenticato:
-        user_in = st.text_input("Username Atleta:", key="login_user").strip().lower()
-        pass_in = st.text_input("Password:", type="password", key="login_pass")
-        if st.button("Accedi al Cloud", use_container_width=True):
-            hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
-            if user_in in UTENTI_TEAM and UTENTI_TEAM[user_in] == hash_in:
-                st.session_state.autenticato = True
-                st.session_state.username = user_in
-                st.rerun()
-            else:
-                st.error("Credenziali non valide.")
-    else:
-        st.success(f"🌐 Utente: {st.session_state.username.upper()}")
-        if st.button("🚪 Esci", use_container_width=True):
-            st.session_state.autenticato = False
-            st.session_state.username = ""
-            st.rerun()
-
