@@ -13,11 +13,16 @@ UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 try:
     # 1. LETTURA PULITA FILE 1 (ALLENAMENTI)
     url_all_grezzo = st.secrets["connections"]["gsheets"]["url"]
-    # Estraiamo solo la radice del link prima di /edit per azzerare ogni vecchio parametro gid errato
-    base_link_all = url_all_grezzo.split("/edit") if "/edit" in url_all_grezzo else url_all_grezzo.split("?")[0].rstrip("/")
     
-    # Scarichiamo la prima scheda rimasta (che ora contiene solo gli allenamenti)
-    csv_url_all = f"{base_link_all}/export?format=csv&nocache={int(time.time())}"
+    # Pulizia sicura della stringa per isolare l'ID base senza generare liste []
+    if "/edit" in url_all_grezzo:
+        base_link_all = url_all_grezzo.split("/edit")[0]
+    elif "?" in url_all_grezzo:
+        base_link_all = url_all_grezzo.split("?")[0]
+    else:
+        base_link_all = url_all_grezzo.rstrip("/")
+        
+    csv_url_all = f"{base_link_all}/export?format=csv&gid=0&nocache={int(time.time())}"
     df_completo = pd.read_csv(csv_url_all)
     df_completo.columns = df_completo.columns.str.strip()
 
@@ -25,15 +30,20 @@ try:
     try:
         import random
         url_cred_grezzo = st.secrets["connections"]["gsheets"]["url_credenziali"]
-        base_link_cred = url_cred_grezzo.split("/edit") if "/edit" in url_cred_grezzo else url_cred_grezzo.split("?")[0].rstrip("/")
         
-        # Scarichiamo la prima scheda del secondo file (le password)
-        csv_url_cred = f"{base_link_cred}/export?format=csv&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        if "/edit" in url_cred_grezzo:
+            base_link_cred = url_cred_grezzo.split("/edit")[0]
+        elif "?" in url_cred_grezzo:
+            base_link_cred = url_cred_grezzo.split("?")[0]
+        else:
+            base_link_cred = url_cred_grezzo.rstrip("/")
+            
+        csv_url_cred = f"{base_link_cred}/export?format=csv&gid=0&nocache={int(time.time())}&r={random.randint(1,9999)}"
         df_utenti = pd.read_csv(csv_url_cred)
         df_utenti.columns = df_utenti.columns.str.strip()
         
         # Sincronizziamo username (Colonna A) e password (Colonna B)
-        if df_utenti.shape >= 2:
+        if df_utenti.shape[1] >= 2:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
@@ -48,6 +58,7 @@ except Exception as e:
     st.stop()
 
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
