@@ -176,7 +176,7 @@ with st.sidebar:
             else:
                 st.error("Credenziali non valide.")
     else:
-        st.success(f"🌐 Utente: {st.session_state.username.upper()}")
+        st.success(f"🌐 Utente: {st.session_state.username()}")
         if st.button("🚪 Esci", use_container_width=True):
             st.session_state.autenticato = False
             st.session_state.username = ""
