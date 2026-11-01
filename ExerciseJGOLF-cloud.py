@@ -88,17 +88,17 @@ else:
             
             with c1:
                 st.markdown('<div style="background-color: #e8f4f8; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>⚡</h2><b>PRE GARA</b></div>', unsafe_allow_html=True)
-                if st.button("Sblocca Pre Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): 
+                if st.button("Pre Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "⚡ Pre Gara" else "secondary"): 
                     st.session_state.fase_selezionata = "⚡ Pre Gara"; st.rerun()
             
             with c2:
                 st.markdown('<div style="background-color: #e8f8f0; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>🧘</h2><b>POST GARA</b></div>', unsafe_allow_html=True)
-                if st.button("Sblocca Post Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): 
+                if st.button("Post Gara", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🧘 Post Gara" else "secondary"): 
                     st.session_state.fase_selezionata = "🧘 Post Gara"; st.rerun()
             
             with c3:
                 st.markdown('<div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><h2>🏠</h2><b>A CASA</b></div>', unsafe_allow_html=True)
-                if st.button("Sblocca Casa", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): 
+                if st.button("Casa", use_container_width=True, type="primary" if st.session_state.fase_selezionata == "🏠 Allenamento a Casa" else "secondary"): 
                     st.session_state.fase_selezionata = "🏠 Allenamento a Casa"; st.rerun()
 
             st.write("---")
