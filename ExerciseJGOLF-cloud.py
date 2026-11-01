@@ -4,9 +4,15 @@ import hashlib, requests, json, time
 
 st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
+try:
+    base_url = st.secrets["connections"]["gsheets"]["url"]
+    csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp=sharing" in base_url else (base_url.split("edit#")[0] + "export?format=csv" if "edit#" in base_url else base_url + "/export?format=csv")
+    df_completo = pd.read_csv(f"{csv_url}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
+    df_completo.columns = df_completo.columns.str.strip()
+
     try:
         import random
-        # Forziamo Google a ignorare la cache lato server con due parametri variabili
+        # Forziamo Google a ignorare la cache lato server con parametri variabili
         df_utenti = pd.read_csv(f"{csv_url}&sheet=Credenziali&nocache={int(time.time())}&r={random.randint(1,9999)}")
         df_utenti.columns = df_utenti.columns.str.strip()
         
@@ -26,6 +32,7 @@ st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon
 except Exception as e:
     st.error("Configura correttamente il link del tuo Google Sheet nei Secrets.")
     st.stop()
+
 
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": ["🦒 Mobilità collo", "🏋️‍♂️ Mobilità spalle con ferro", "🔄 Mobilità dorso ferro", "🎯 Mobilità bacino", "🦶 Mobilità piedi/caviglie", "🎗️ Swing con elastico", "🧎‍♂️ Core: Crunch", "🪲 Core: Dead bug", "🌉 Core: Ponti", "⏱️ Core: Plank"],
