@@ -11,34 +11,23 @@ if 'nuovo_utente_locale' not in st.session_state:
 UTENTI_TEAM = {"coach": "coachmaster", "atleta1": "golf2026"}
 
 try:
-    # 1. LETTURA PULITA FILE 1 (ALLENAMENTI)
+    # 1. LETTURA FILE 1 (ALLENAMENTI)
     url_all_grezzo = st.secrets["connections"]["gsheets"]["url"]
+    base_link_all = url_all_grezzo.split("/edit")[0] if "/edit" in url_all_grezzo else url_all_grezzo.split("?")[0].rstrip("/")
     
-    # Pulizia sicura della stringa per isolare l'ID base senza generare liste []
-    if "/edit" in url_all_grezzo:
-        base_link_all = url_all_grezzo.split("/edit")[0]
-    elif "?" in url_all_grezzo:
-        base_link_all = url_all_grezzo.split("?")[0]
-    else:
-        base_link_all = url_all_grezzo.rstrip("/")
-        
-    csv_url_all = f"{base_link_all}/export?format=csv&gid=0&nocache={int(time.time())}"
+    # Scarichiamo direttamente il file (Google prende l'unico foglio presente)
+    csv_url_all = f"{base_link_all}/export?format=csv&nocache={int(time.time())}"
     df_completo = pd.read_csv(csv_url_all)
     df_completo.columns = df_completo.columns.str.strip()
 
-    # 2. LETTURA PULITA FILE 2 (CREDENZIALI)
+    # 2. LETTURA FILE 2 (CREDENZIALI)
     try:
         import random
         url_cred_grezzo = st.secrets["connections"]["gsheets"]["url_credenziali"]
+        base_link_cred = url_cred_grezzo.split("/edit")[0] if "/edit" in url_cred_grezzo else url_cred_grezzo.split("?")[0].rstrip("/")
         
-        if "/edit" in url_cred_grezzo:
-            base_link_cred = url_cred_grezzo.split("/edit")[0]
-        elif "?" in url_cred_grezzo:
-            base_link_cred = url_cred_grezzo.split("?")[0]
-        else:
-            base_link_cred = url_cred_grezzo.rstrip("/")
-            
-        csv_url_cred = f"{base_link_cred}/export?format=csv&gid=0&nocache={int(time.time())}&r={random.randint(1,9999)}"
+        # Scarichiamo direttamente l'unico foglio del secondo file
+        csv_url_cred = f"{base_link_cred}/export?format=csv&nocache={int(time.time())}&r={random.randint(1,9999)}"
         df_utenti = pd.read_csv(csv_url_cred)
         df_utenti.columns = df_utenti.columns.str.strip()
         
@@ -58,6 +47,7 @@ except Exception as e:
     st.stop()
 
 UTENTI_TEAM.update(st.session_state.nuovo_utente_locale)
+
 
 
 DIZIONARIO_ESERCIZI = {
