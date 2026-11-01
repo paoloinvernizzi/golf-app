@@ -37,7 +37,7 @@ UTENTI_TEAM = {
 }
 
 # ==========================================
-# 3. DATABASE ESERCIZI (STRUTTURA AD APP SENZA TENDINE NIDIFICATE)
+# 3. DATABASE ESERCIZI (STRUTTURA AD APP)
 # ==========================================
 DIZIONARIO_ESERCIZI = {
     "⚡ Pre Gara": [
@@ -116,11 +116,10 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    # Adattamento nomi colonne per maiuscole/minuscole
-    df_completo.columns = df_completo.columns.str.strip()
+    # Normalizzazione e mappatura sicura dei nomi delle colonne
     col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns[1])
     col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns[2])
-    col_diff = 'Difficoltà' if 'Difficoltà' in df_completo.columns else ('difficolta' if 'difficolta' in df_completo.columns else df_completo.columns[-2])
+    col_diff = 'Difficoltà' if 'Difficoltà' in df_completo.columns else ('difficolta' if 'difficolta' in df_completo.columns else df_completo.columns[-1])
 
     if is_coach:
         st.title("👨‍🏫 Pannello Coach (Visione Globale)")
@@ -136,14 +135,13 @@ else:
 
     tab_inserimento, tab_dashboard = st.tabs(["📝 Inserisci Allenamento", "📊 Vedi Progressi"])
 
-    # --- TAB INSERIMENTO DATI (INTERFACCIA DIGITALE VISUALE) ---
+    # --- TAB INSERIMENTO DATI (INTERFACCIA GRAFICA CARD) ---
     with tab_inserimento:
         if is_coach:
             st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare esercizi effettua l'accesso come atleta.")
         else:
             st.markdown("### 🎯 Seleziona la tua sessione")
             
-            # Pannello a 3 Quadranti Nativo con Immagini HD e Pulsanti
             card1, card2, card3 = st.columns(3)
             
             with card1:
@@ -190,5 +188,7 @@ else:
                     if not SCRIPT_URL:
                         st.error("URL dello Script non configurato nei Secrets.")
                     else:
+                        # Correzione: Parentesi graffa del dizionario payload chiusa correttamente
                         payload = {
                             "utente": st.session_state.username.strip().lower(),
+                            "fase": st.session_state.fase_selezionata,
