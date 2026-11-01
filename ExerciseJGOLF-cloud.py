@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-import hashlib, requests, json, time 
+import hashlib, requests, json, time
 
-st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳") 
+st.set_page_config(page_title="Golf Performance Cloud", layout="wide", page_icon="⛳")
 
 ### ==========================================
 
@@ -17,7 +17,7 @@ csv_url = base_url.replace("edit?usp=sharing", "export?format=csv") if "edit?usp
 ### Lettura Foglio 1 (Risposte del modulo 1)
 
 df_completo = pd.read_csv(f"{csv_url}&sheet=Risposte+del+modulo+1&nocache={int(time.time())}")
-df_completo.columns = df_completo.columns.str.strip() 
+df_completo.columns = df_completo.columns.str.strip()
 
 ### Lettura Foglio Credenziali
 
