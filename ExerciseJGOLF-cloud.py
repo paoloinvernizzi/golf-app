@@ -40,9 +40,6 @@ try:
             utenti_letti = dict(zip(
                 df_utenti.iloc[:, 0].astype(str).str.lower().str.strip(), 
                 df_utenti.iloc[:, 1].astype(str).str.strip()
-                # --- RIGA DI DIAGNOSTICA TEMPORANEA ---
-                # Questo mostrerà nella barra laterale cosa c'è DAVVERO nel foglio Credenziali online
-                st.sidebar.write("Debug Utenti Online:", df_utenti)
 
             ))
             # Sincronizziamo i dati online nel dizionario dell'applicazione
