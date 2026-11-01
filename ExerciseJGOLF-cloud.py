@@ -151,25 +151,25 @@ else:
             with cp2:
                 difficolta = st.slider("⭐ Fatica Percepita (RPE 1-5):", min_value=1, max_value=5, value=3)
                 impressioni = st.text_area("💭 Note e sensazioni:")
-if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
-try:
-url_script = st.secrets["connections"]["gsheets"]["script_url"]
-payload = {"azione": "allenamento", "utente": st.session_state.username, "fase": st.session_state.fase_selezionata, "categoria": "Sessione Diretta", "esercizio": st.session_state.esercizio_selezionato, "serie": int(serie), "ripetizioni": int(ripetizioni), "peso": float(carico), "difficolta": int(difficolta), "note": impressioni}
-res = requests.post(url_script, data=json.dumps(payload), headers={"Content-Type": "text/plain"}, allow_redirects=True)
-if res.status_code == 200: st.success("💪 Ottimo lavoro! Sessione salvata nel Cloud.")
-else: st.error(f"Errore di rete. Codice: {res.status_code}")
-except Exception as err: st.error(f"Impossibile salvare: {err}")
-with tab_dashboard:
-t_col, r_col = st.columns(2)
-with t_col: st.subheader("📊 Carichi di Lavoro Live")
-with r_col:
-if st.button("🔄 Aggiorna Dati", use_container_width=True): st.rerun()
-if df_visibile.empty: st.info("Nessun dato registrato al momento nel database Cloud.")
-else:
-k1, k2 = st.columns(2)
-k1.metric("Esercizi Totali", len(df_visibile))
-if col_diff in df_visibile.columns:
-df_visibile[col_diff] = pd.to_numeric(df_visibile[col_diff], errors='coerce')
-k2.metric("Media Fatica Percepita", f"{df_visibile[col_diff].mean():.1f} / 5 ⭐")
-st.write("---")
-st.dataframe(df_visibile, use_container_width=True)
+            if st.button("🚀 Sincronizza nel Cloud Team", use_container_width=True):
+                try:
+                    url_script = st.secrets["connections"]["gsheets"]["script_url"]
+                    payload = {"azione": "allenamento", "utente": st.session_state.username, "fase": st.session_state.fase_selezionata, "categoria": "Sessione Diretta", "esercizio": st.session_state.esercizio_selezionato, "serie": int(serie), "ripetizioni": int(ripetizioni), "peso": float(carico), "difficolta": int(difficolta), "note": impressioni}
+                    res = requests.post(url_script, data=json.dumps(payload), headers={"Content-Type": "text/plain"}, allow_redirects=True)
+            if res.status_code == 200: st.success("💪 Ottimo lavoro! Sessione salvata nel Cloud.")
+            else: st.error(f"Errore di rete. Codice: {res.status_code}")
+            except Exception as err: st.error(f"Impossibile salvare: {err}")
+            with tab_dashboard:
+                    t_col, r_col = st.columns(2)
+            with t_col: st.subheader("📊 Carichi di Lavoro Live")
+            with r_col:
+            if st.button("🔄 Aggiorna Dati", use_container_width=True): st.rerun()
+            if df_visibile.empty: st.info("Nessun dato registrato al momento nel database Cloud.")
+            else:
+                    k1, k2 = st.columns(2)
+                    k1.metric("Esercizi Totali", len(df_visibile))
+                    if col_diff in df_visibile.columns:
+                    df_visibile[col_diff] = pd.to_numeric(df_visibile[col_diff], errors='coerce')
+                    k2.metric("Media Fatica Percepita", f"{df_visibile[col_diff].mean():.1f} / 5 ⭐")
+                    st.write("---")
+                    st.dataframe(df_visibile, use_container_width=True)
