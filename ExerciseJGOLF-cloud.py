@@ -116,8 +116,8 @@ if not st.session_state.autenticato:
 else:
     is_coach = (st.session_state.username == "coach")
     
-    col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns[1])
-    col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns[2])
+    col_utente = 'Utente' if 'Utente' in df_completo.columns else ('utente' if 'utente' in df_completo.columns else df_completo.columns[0])
+    col_fase = 'Fase' if 'Fase' in df_completo.columns else ('fase' if 'fase' in df_completo.columns else df_completo.columns[1])
     col_diff = 'Difficoltà' if 'Difficoltà' in df_completo.columns else ('difficolta' if 'difficolta' in df_completo.columns else df_completo.columns[-1])
 
     if is_coach:
@@ -134,7 +134,7 @@ else:
 
     tab_inserimento, tab_dashboard = st.tabs(["📝 Inserisci Allenamento", "📊 Vedi Progressi"])
 
-    # --- TAB INSERIMENTO DATI (INTERFACCIA GRAFICA CARD) ---
+    # --- TAB INSERIMENTO DATI (INTERFACCIA NATIVA AD APP) ---
     with tab_inserimento:
         if is_coach:
             st.warning("I profili Coach monitorano i dati esclusivamente dalla tab 'Vedi Progressi'. Per registrare esercizi effettua l'accesso come atleta.")
@@ -187,4 +187,72 @@ else:
                     if not SCRIPT_URL:
                         st.error("URL dello Script non configurato nei Secrets.")
                     else:
-                        # Scrittura forzata del payload su riga singola pulita per evitare SyntaxError
+                        payload = {
+                            "utente": st.session_state.username.strip().lower(),
+                            "fase": st.session_state.fase_selezionata,
+                            "categoria": "Sessione Diretta",
+                            "esercizio": esercizio_scelto,
+                            "serie": int(serie),
+"ripetizioni": int(ripetizioni),
+"peso": float(carico),
+"difficolta": int(difficolta),
+"note": impressioni
+}
+inviato = requests.post(
+SCRIPT_URL,
+data=json.dumps(payload),
+headers={"Content-Type": "text/plain"},
+allow_redirects=True
+)
+if inviato.status_code == 200:
+st.success("💪 Ottimo lavoro! Sessione salvata sul Cloud. Spostati in Dashboard per controllare lo storico.")
+else:
+st.error(f"Errore di rete con il server Google. Status code: {inviato.status_code}")
+except Exception as err:
+st.error(f"Impossibile completare il salvataggio: {err}")
+# --- TAB DASHBOARD & MONITORAGGIO ---
+with tab_dashboard:
+col_titolo, col_refresh = st.columns(2)
+with col_titolo:
+st.subheader("📊 Analisi Carichi di Lavoro Live")
+with col_refresh:
+if st.button("🔄 Aggiorna Dati", use_container_width=True):
+st.rerun()
+if df_visibile.empty:
+st.info("Nessun dato registrato al momento nel database Cloud per questa selezione.")
+else:
+c1, c2, c3 = st.columns(3)
+c1.metric("Esercizi Totali", len(df_visibile))
+if col_diff in df_visibile.columns:
+df_visibile[col_diff] = pd.to_numeric(df_visibile[col_diff], errors='coerce')
+c2.metric("Media Fatica Percepita", f"{df_visibile[col_diff].mean():.1f} / 5 ⭐")
+else:
+c2.metric("Media Fatica Percepita", "N/D")
+most_phase = df_visibile[col_fase].mode() if col_fase in df_visibile.columns else pd.Series()
+c3.metric("Focus Principale", str(most_phase.values) if not most_phase.empty else "N/D")
+st.write("---")
+col_pre, col_post, col_casa = st.columns(3)
+with col_pre:
+st.markdown("#### ⚡ PRE GARA")
+sub_pre = df_visibile[df_visibile[col_fase].astype(str).str.contains("Pre Gara", na=False)] if col_fase in df_visibile.columns else pd.DataFrame()
+if not sub_pre.empty:
+st.dataframe(sub_pre, hide_index=True, use_container_width=True)
+else:
+st.caption("Nessuna attività registrata.")
+with col_post:
+st.markdown("#### 🧘 POST GARA")
+sub_post = df_visibile[df_visibile[col_fase].astype(str).str.contains("Post Gara", na=False)] if col_fase in df_visibile.columns else pd.DataFrame()
+if not sub_post.empty:
+st.dataframe(sub_post, hide_index=True, use_container_width=True)
+else:
+st.caption("Nessuna attività registrata.")
+with col_casa:
+st.markdown("#### 🏠 ALLENAMENTO CASA")
+sub_casa = df_visibile[df_visibile[col_fase].astype(str).str.contains("Casa", na=False)] if col_fase in df_visibile.columns else pd.DataFrame()
+if not sub_casa.empty:
+st.dataframe(sub_casa, hide_index=True, use_container_width=True)
+else:
+st.caption("Nessuna attività registrata.")
+st.write("---")
+st.markdown("#### 📋 Storico Sessioni Completo")
+st.dataframe(df_visibile, use_container_width=True)
